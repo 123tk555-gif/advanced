@@ -1,6 +1,6 @@
 import { zValidator } from "@hono/zod-validator";
-import { profileInput, tripInput } from "@tritri/shared";
-import { Hono } from "hono";
+import { itemCreate, itemPatch, profileInput, tripInput } from "@tritri/shared";
+import { type Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createMiddleware } from "hono/factory";
 import { secureHeaders } from "hono/secure-headers";
@@ -15,6 +15,7 @@ import {
   replaceInvite,
   requestJoin,
 } from "./repo/invites.js";
+import { createItem, deleteItem, type Item, updateItem } from "./repo/items.js";
 import { getProfile, putProfile } from "./repo/profiles.js";
 import { createTrip, getMember, getTripView, listMyTrips } from "./repo/trips.js";
 
@@ -146,6 +147,57 @@ export function createApp(deps: Deps) {
   app.delete("/trips/:tripId/invite", ownerOnly, async (c) => {
     await replaceInvite(deps, c.req.param("tripId"), null);
     return c.body(null, 204);
+  });
+
+  // ---- しおりの予定 ----
+  const itemResult = (
+    c: Context<AppEnv>,
+    result:
+      | { item: Item }
+      | { error: "not_found" | "day_out_of_range" | "too_many" }
+      | { error: "conflict"; current: Item },
+    okStatus: 200 | 201,
+  ) => {
+    if ("item" in result) return c.json({ item: result.item }, okStatus);
+    switch (result.error) {
+      case "not_found":
+        return c.json(notFound, 404);
+      case "day_out_of_range":
+        return c.json({ error: "DAY_OUT_OF_RANGE" }, 400);
+      case "too_many":
+        return c.json({ error: "TOO_MANY_ITEMS" }, 409);
+      case "conflict":
+        return c.json({ error: "VERSION_CONFLICT", current: result.current }, 409);
+    }
+  };
+
+  app.post("/trips/:tripId/items", validJson(itemCreate), async (c) => {
+    const result = await createItem(
+      deps,
+      c.req.param("tripId"),
+      c.get("userId"),
+      c.req.valid("json"),
+    );
+    return itemResult(c, result, 201);
+  });
+
+  app.patch("/trips/:tripId/items/:itemId", validJson(itemPatch), async (c) => {
+    const { tripId, itemId } = c.req.param();
+    const result = await updateItem(deps, tripId, itemId, c.get("userId"), c.req.valid("json"));
+    return itemResult(c, result, 200);
+  });
+
+  app.delete("/trips/:tripId/items/:itemId", async (c) => {
+    const version = c.req.query("version") ?? "";
+    if (!/^[1-9]\d{0,8}$/.test(version)) {
+      return c.json({ error: "VALIDATION", issues: [{ path: "version", message: "必須" }] }, 400);
+    }
+    const { tripId, itemId } = c.req.param();
+    const result = await deleteItem(deps, tripId, itemId, Number(version));
+    if ("deleted" in result) return c.body(null, 204);
+    return result.error === "not_found"
+      ? c.json(notFound, 404)
+      : c.json({ error: "VERSION_CONFLICT", current: result.current }, 409);
   });
 
   app.notFound((c) => c.json(notFound, 404));

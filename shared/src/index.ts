@@ -1,4 +1,14 @@
 export {
+  compareOrderKey,
+  type ItemCreate,
+  type ItemPatch,
+  isValidOrderKey,
+  itemCreate,
+  itemPatch,
+  MAX_ITEMS_PER_TRIP,
+  type Place,
+} from "./items.js";
+export {
   INVITE_VALID_DAYS,
   MAX_MEMBERS,
   MAX_PENDING_JOIN_REQUESTS,

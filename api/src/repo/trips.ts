@@ -6,10 +6,11 @@ import {
   QueryCommand,
   TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { INVITE_VALID_DAYS, type TripInput } from "@tritri/shared";
+import { compareOrderKey, INVITE_VALID_DAYS, type TripInput } from "@tritri/shared";
 import { ulid } from "ulid";
 import type { Deps } from "../context.js";
 import { GSI1, keys } from "../db/table.js";
+import { type Item, toItem } from "./items.js";
 
 export type Role = "owner" | "member";
 
@@ -234,6 +235,8 @@ export async function getTripMeta(
 export interface TripView {
   trip: Trip;
   members: Member[];
+  /** 予定。日にち → 並び順の順 */
+  items: Item[];
   myRole: Role;
   invite: Invite | null;
 }
@@ -268,5 +271,18 @@ export async function getTripView(
     .filter((i) => String(i.SK).startsWith("MEMBER#"))
     .map(toMember)
     .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
-  return { trip: toTrip(meta), members, myRole: me.role, invite: toInvite(meta) };
+  const tripItems = items
+    .filter((i) => String(i.SK).startsWith("ITEM#"))
+    .map(toItem)
+    .sort(
+      (a, b) =>
+        a.day - b.day || compareOrderKey(a.order, b.order) || compareOrderKey(a.itemId, b.itemId),
+    );
+  return {
+    trip: toTrip(meta),
+    members,
+    items: tripItems,
+    myRole: me.role,
+    invite: toInvite(meta),
+  };
 }

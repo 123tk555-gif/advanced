@@ -1,0 +1,70 @@
+import { generateKeyBetween } from "fractional-indexing";
+import { z } from "zod";
+import { MAX_TRIP_DAYS } from "./schemas.js";
+
+/** 1 つの旅の予定の上限 */
+export const MAX_ITEMS_PER_TRIP = 300;
+
+/**
+ * 並び順のキーとして正しい形か。
+ * キーは画面側で generateKeyBetween(前の予定のキー, 後ろの予定のキー) で作る。
+ * 並べ替えでは、動かした予定のキーだけを書き換えればよい。
+ */
+export function isValidOrderKey(key: string): boolean {
+  if (key.length === 0 || key.length > 64) return false;
+  try {
+    generateKeyBetween(key, null); // 形が正しくなければ例外になる
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 並び順のキーの比べ方(文字コードの順。localeCompare は使わない) */
+export function compareOrderKey(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+const placeSchema = z.object({
+  name: z.string().trim().min(1).max(200),
+  placeId: z.string().min(1).max(300).optional(),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+});
+export type Place = z.infer<typeof placeSchema>;
+
+const fields = {
+  day: z.number().int().min(1).max(MAX_TRIP_DAYS),
+  order: z.string().refine(isValidOrderKey, "並び順の形が正しくありません"),
+  time: z.union([z.literal(""), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)]),
+  title: z.string().trim().min(1).max(100),
+  place: placeSchema.nullable(),
+  memo: z.string().max(1000),
+};
+
+export const itemCreate = z.object({
+  day: fields.day,
+  order: fields.order,
+  title: fields.title,
+  time: fields.time.optional().default(""),
+  place: fields.place.optional().default(null),
+  memo: fields.memo.optional().default(""),
+});
+export type ItemCreate = z.infer<typeof itemCreate>;
+
+const patchFields = {
+  day: fields.day.optional(),
+  order: fields.order.optional(),
+  title: fields.title.optional(),
+  time: fields.time.optional(),
+  place: fields.place.optional(),
+  memo: fields.memo.optional(),
+};
+
+/** 予定の更新。version は、編集を始めたときに読んだ版(楽観ロック) */
+export const itemPatch = z
+  .object({ version: z.number().int().min(1), ...patchFields })
+  .refine((p) => Object.keys(patchFields).some((k) => p[k as keyof typeof p] !== undefined), {
+    message: "変える項目がありません",
+  });
+export type ItemPatch = z.infer<typeof itemPatch>;

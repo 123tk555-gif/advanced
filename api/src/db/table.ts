@@ -50,6 +50,7 @@ export const keys = {
     PK: `TRIP#${tripId}`,
     SK: `JOINREQ#${userId}`,
   }),
+  item: (tripId: string, itemId: string) => ({ PK: `TRIP#${tripId}`, SK: `ITEM#${itemId}` }),
   invite: (token: string) => ({ PK: `INVITE#${token}`, SK: "INVITE" }),
   tripPk: (tripId: string) => `TRIP#${tripId}`,
   userPk: (userId: string) => `USER#${userId}`,
