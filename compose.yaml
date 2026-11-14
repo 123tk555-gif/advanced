@@ -1,0 +1,8 @@
+# 開発・テスト用の DynamoDB Local(本番は AWS の DynamoDB を使う)
+# 起動: docker compose up -d dynamodb
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: -jar DynamoDBLocal.jar -inMemory -sharedDb
+    ports:
+      - "8000:8000"
