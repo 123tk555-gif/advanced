@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tri-Tri(プロトタイプ)</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">本文へ移動</a>
+
+    <!-- プロトタイプ専用: 表示する人の切り替えとデモ操作 -->
+    <aside class="demo-bar" id="demo-bar" aria-label="プロトタイプの操作"></aside>
+
+    <header class="site-header">
+      <div class="inner">
+        <a class="logo" href="#/trips">Tri-Tri</a>
+        <nav id="nav" aria-label="メインメニュー"></nav>
+      </div>
+    </header>
+
+    <main id="main" tabindex="-1"></main>
+
+    <div class="toast-area" id="toasts" role="status" aria-live="polite"></div>
+
+    <dialog id="dialog" aria-labelledby="dialog-title"></dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
