@@ -8,9 +8,12 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -p shared && tsc -p api",
+    "typecheck": "tsc -p shared && tsc -p api && corepack pnpm --filter @tritri/web typecheck",
     "lint": "biome check .",
-    "format": "biome check --write ."
+    "format": "biome check --write .",
+    "test:e2e": "corepack pnpm --filter @tritri/e2e test",
+    "dev:api": "corepack pnpm --filter @tritri/api dev",
+    "dev:web": "corepack pnpm --filter @tritri/web dev"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

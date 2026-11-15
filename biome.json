@@ -23,10 +23,33 @@
   },
   "overrides": [
     {
-      "includes": ["prototype/**"],
+      "includes": ["prototype/**", "web/app/assets/css/**"],
       "linter": {
         "rules": {
-          "style": { "noDescendingSpecificity": "off" }
+          "style": {
+            "noDescendingSpecificity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.vue"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["web/app/pages/**", "web/app/layouts/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useVueMultiWordComponentNames": "off"
+          }
         }
       }
     }

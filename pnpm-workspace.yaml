@@ -1,3 +1,9 @@
 packages:
   - shared
   - api
+  - web
+  - e2e
+
+# インストール時にスクリプトの実行を許す部品(それ以外は pnpm が止める)
+allowBuilds:
+  esbuild: true
