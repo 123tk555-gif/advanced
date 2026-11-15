@@ -11,7 +11,8 @@ export async function getProfile(deps: Deps, userId: string): Promise<Profile | 
   const res = await deps.db.send(
     new GetCommand({ TableName: deps.tableName, Key: keys.profile(userId) }),
   );
-  if (!res.Item) return undefined;
+  // 退会した人のプロフィールは、無いものとして扱う
+  if (!res.Item || res.Item.deletedAt) return undefined;
   return { userId, displayName: res.Item.displayName as string };
 }
 

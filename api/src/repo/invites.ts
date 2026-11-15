@@ -55,6 +55,7 @@ export async function requestJoin(
   tripId: string,
   profile: Profile,
 ): Promise<"created" | "exists" | "full"> {
+  const requestedAt = deps.now().toISOString();
   try {
     await retryOnConflict(() =>
       deps.db.send(
@@ -65,10 +66,12 @@ export async function requestJoin(
                 TableName: deps.tableName,
                 Item: {
                   ...keys.joinRequest(tripId, profile.userId),
+                  ...keys.joinRequestGsi(profile.userId, requestedAt, tripId),
                   type: "joinRequest",
+                  tripId,
                   userId: profile.userId,
                   displayName: profile.displayName,
-                  requestedAt: deps.now().toISOString(),
+                  requestedAt,
                 },
                 ConditionExpression: "attribute_not_exists(PK)",
               },
@@ -213,6 +216,8 @@ export async function rejectJoin(
                 TableName: deps.tableName,
                 Key: keys.tripMeta(tripId),
                 UpdateExpression: "SET joinRequestCount = joinRequestCount - :one",
+                // 旅が消えていたら書かない(消えた旅の META を作り直さないように)
+                ConditionExpression: "attribute_exists(PK)",
                 ExpressionAttributeValues: { ":one": 1 },
               },
             },

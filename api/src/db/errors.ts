@@ -1,4 +1,8 @@
 import { TransactionCanceledException } from "@aws-sdk/client-dynamodb";
+import type { TransactWriteCommandInput } from "@aws-sdk/lib-dynamodb";
+
+/** TransactWrite の書き込み 1 つ分 */
+export type TransactItem = NonNullable<TransactWriteCommandInput["TransactItems"]>[number];
 
 /**
  * TransactWrite が条件に合わずに取り消されたとき、どの書き込み(番号)の条件で失敗したかを返す。

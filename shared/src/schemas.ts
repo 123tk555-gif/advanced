@@ -37,3 +37,6 @@ export const tripInput = z
     path: ["endDate"],
   });
 export type TripInput = z.infer<typeof tripInput>;
+
+/** オーナーの引き継ぎ先 */
+export const transferInput = z.object({ userId: z.string().min(1) });

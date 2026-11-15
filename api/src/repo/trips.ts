@@ -6,10 +6,19 @@ import {
   QueryCommand,
   TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { compareOrderKey, INVITE_VALID_DAYS, type TripInput } from "@tritri/shared";
+import {
+  compareOrderKey,
+  INVITE_VALID_DAYS,
+  settle,
+  type Transfer,
+  type TripInput,
+} from "@tritri/shared";
 import { ulid } from "ulid";
 import type { Deps } from "../context.js";
 import { GSI1, keys } from "../db/table.js";
+import { type Comment, groupComments } from "./comments.js";
+import { type Expense, toExpense } from "./expenses.js";
+import { buildIdeas, type Idea } from "./ideas.js";
 import { type Item, toItem } from "./items.js";
 
 export type Role = "owner" | "member";
@@ -175,8 +184,9 @@ export async function listMyTrips(deps: Deps, userId: string): Promise<MyTrip[]>
       new QueryCommand({
         TableName: deps.tableName,
         IndexName: GSI1,
-        KeyConditionExpression: "GSI1PK = :pk",
-        ExpressionAttributeValues: { ":pk": keys.userPk(userId) },
+        // GSI1 には参加申請(JOINREQ#…)も入っているので、メンバー(TRIP#…)だけを取る
+        KeyConditionExpression: "GSI1PK = :pk AND begins_with(GSI1SK, :trip)",
+        ExpressionAttributeValues: { ":pk": keys.userPk(userId), ":trip": "TRIP#" },
         ExclusiveStartKey: startKey,
       }),
     );
@@ -235,10 +245,50 @@ export async function getTripMeta(
 export interface TripView {
   trip: Trip;
   members: Member[];
-  /** 予定。日にち → 並び順の順 */
-  items: Item[];
+  /** 予定(コメントつき)。日にち → 並び順の順 */
+  items: (Item & { comments: Comment[] })[];
+  /** 行きたい場所の候補。票の多い順 */
+  ideas: Idea[];
+  /** 支出(新しい順)と、精算(誰が誰にいくら) */
+  expenses: Expense[];
+  settlement: Transfer[];
   myRole: Role;
   invite: Invite | null;
+  /** 公開しおりのリンク。公開していなければ null */
+  public: { token: string } | null;
+}
+
+/** 旅のデータ(PK = TRIP#<id> の項目すべて)を 1 回の Query で取り、種類ごとに分ける */
+export async function loadTripPartition(deps: Deps, tripId: string) {
+  const records: Record<string, unknown>[] = [];
+  let startKey: Record<string, unknown> | undefined;
+  do {
+    const res = await deps.db.send(
+      new QueryCommand({
+        TableName: deps.tableName,
+        KeyConditionExpression: "PK = :pk",
+        ExpressionAttributeValues: { ":pk": keys.tripPk(tripId) },
+        ExclusiveStartKey: startKey,
+      }),
+    );
+    records.push(...(res.Items ?? []));
+    startKey = res.LastEvaluatedKey;
+  } while (startKey);
+
+  const of = (prefix: string) => records.filter((r) => String(r.SK).startsWith(prefix));
+  return {
+    meta: records.find((r) => r.SK === "META"),
+    members: of("MEMBER#")
+      .map(toMember)
+      .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt)),
+    items: of("ITEM#")
+      .map(toItem)
+      .sort(
+        (a, b) =>
+          a.day - b.day || compareOrderKey(a.order, b.order) || compareOrderKey(a.itemId, b.itemId),
+      ),
+    of,
+  };
 }
 
 /**
@@ -250,39 +300,51 @@ export async function getTripView(
   tripId: string,
   me: Member,
 ): Promise<TripView | undefined> {
-  const items: Record<string, unknown>[] = [];
-  let startKey: Record<string, unknown> | undefined;
-  do {
-    const res = await deps.db.send(
-      new QueryCommand({
-        TableName: deps.tableName,
-        KeyConditionExpression: "PK = :pk",
-        ExpressionAttributeValues: { ":pk": keys.tripPk(tripId) },
-        ExclusiveStartKey: startKey,
-      }),
-    );
-    items.push(...(res.Items ?? []));
-    startKey = res.LastEvaluatedKey;
-  } while (startKey);
-
-  const meta = items.find((i) => i.SK === "META");
+  const { meta, members, items, of } = await loadTripPartition(deps, tripId);
   if (!meta) return undefined;
-  const members = items
-    .filter((i) => String(i.SK).startsWith("MEMBER#"))
-    .map(toMember)
-    .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
-  const tripItems = items
-    .filter((i) => String(i.SK).startsWith("ITEM#"))
-    .map(toItem)
-    .sort(
-      (a, b) =>
-        a.day - b.day || compareOrderKey(a.order, b.order) || compareOrderKey(a.itemId, b.itemId),
-    );
+  // コメントは予定ごとに付ける(消えた予定のコメントが残っていても出さない)
+  const comments = groupComments(of("CMT#"), members);
+  // 支出は新しい順。精算には、抜けたメンバーの支出も含める
+  const expenses = of("EXP#")
+    .map(toExpense)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return {
     trip: toTrip(meta),
     members,
-    items: tripItems,
+    items: items.map((i) => ({ ...i, comments: comments.get(i.itemId) ?? [] })),
+    ideas: buildIdeas(of("IDEA#"), of("VOTE#"), me.userId),
+    expenses,
+    settlement: settle(expenses),
     myRole: me.role,
     invite: toInvite(meta),
+    public: typeof meta.publicToken === "string" ? { token: meta.publicToken } : null,
   };
+}
+
+/** 申請中(オーナーの承認待ち)の旅。見せるのはタイトルと申請日時だけ */
+export async function listMyPendingTrips(
+  deps: Deps,
+  userId: string,
+): Promise<{ title: string; requestedAt: string }[]> {
+  const res = await deps.db.send(
+    new QueryCommand({
+      TableName: deps.tableName,
+      IndexName: GSI1,
+      KeyConditionExpression: "GSI1PK = :pk AND begins_with(GSI1SK, :req)",
+      ExpressionAttributeValues: { ":pk": keys.userPk(userId), ":req": "JOINREQ#" },
+    }),
+  );
+  const requests = res.Items ?? [];
+  const metas = await batchGet(
+    deps,
+    requests.map((r) => keys.tripMeta(r.tripId as string)),
+  );
+  const titles = new Map(metas.map((m) => [m.tripId as string, m.title as string]));
+  return requests
+    .filter((r) => titles.has(r.tripId as string))
+    .map((r) => ({
+      title: titles.get(r.tripId as string) as string,
+      requestedAt: r.requestedAt as string,
+    }))
+    .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt));
 }

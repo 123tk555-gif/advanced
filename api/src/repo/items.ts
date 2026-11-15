@@ -9,7 +9,7 @@ import {
 } from "@tritri/shared";
 import { ulid } from "ulid";
 import type { Deps } from "../context.js";
-import { failedConditionIndex, retryOnConflict } from "../db/errors.js";
+import { failedConditionIndex, retryOnConflict, type TransactItem } from "../db/errors.js";
 import { keys } from "../db/table.js";
 import { getTripMeta } from "./trips.js";
 
@@ -46,7 +46,7 @@ export function toItem(record: Record<string, unknown>): Item {
 type Failure = { error: "not_found" } | { error: "day_out_of_range" };
 
 /** 指定した日が、旅の日数の範囲にあるか */
-async function checkDay(
+export async function checkDay(
   deps: Deps,
   tripId: string,
   day: number | undefined,
@@ -76,6 +76,47 @@ async function conflictOrNotFound(deps: Deps, tripId: string, itemId: string) {
   return current ? ({ error: "conflict", current } as const) : ({ error: "not_found" } as const);
 }
 
+/** 新しい予定の値を作る */
+export function newItem(
+  deps: Deps,
+  userId: string,
+  input: Omit<Item, "itemId" | "version" | "updatedBy" | "updatedAt">,
+): Item {
+  return {
+    itemId: ulid(),
+    ...input,
+    version: 1,
+    updatedBy: userId,
+    updatedAt: deps.now().toISOString(),
+  };
+}
+
+/**
+ * 予定を作る書き込み 2 つ(予定を作る・旅の予定の件数を数えて上限を守る)。
+ * 候補の採用など、ほかのトランザクションにも組み込めるように分けている。
+ */
+export function itemCreateWrites(deps: Deps, tripId: string, item: Item): TransactItem[] {
+  return [
+    {
+      Put: {
+        TableName: deps.tableName,
+        Item: { ...keys.item(tripId, item.itemId), type: "item", ...item },
+        ConditionExpression: "attribute_not_exists(PK)",
+      },
+    },
+    {
+      Update: {
+        TableName: deps.tableName,
+        Key: keys.tripMeta(tripId),
+        UpdateExpression: "SET itemCount = if_not_exists(itemCount, :zero) + :one",
+        ConditionExpression:
+          "attribute_exists(PK) AND (attribute_not_exists(itemCount) OR itemCount < :max)",
+        ExpressionAttributeValues: { ":zero": 0, ":one": 1, ":max": MAX_ITEMS_PER_TRIP },
+      },
+    },
+  ];
+}
+
 /** A6: 予定の追加。旅の予定の件数(itemCount)を同じトランザクションで数え、上限を守る */
 export async function createItem(
   deps: Deps,
@@ -86,37 +127,11 @@ export async function createItem(
   const failure = await checkDay(deps, tripId, input.day);
   if (failure) return failure;
 
-  const item: Item = {
-    itemId: ulid(),
-    ...input,
-    version: 1,
-    updatedBy: userId,
-    updatedAt: deps.now().toISOString(),
-  };
+  const item = newItem(deps, userId, input);
   try {
     await retryOnConflict(() =>
       deps.db.send(
-        new TransactWriteCommand({
-          TransactItems: [
-            {
-              Put: {
-                TableName: deps.tableName,
-                Item: { ...keys.item(tripId, item.itemId), type: "item", ...item },
-                ConditionExpression: "attribute_not_exists(PK)",
-              },
-            },
-            {
-              Update: {
-                TableName: deps.tableName,
-                Key: keys.tripMeta(tripId),
-                UpdateExpression: "SET itemCount = if_not_exists(itemCount, :zero) + :one",
-                ConditionExpression:
-                  "attribute_exists(PK) AND (attribute_not_exists(itemCount) OR itemCount < :max)",
-                ExpressionAttributeValues: { ":zero": 0, ":one": 1, ":max": MAX_ITEMS_PER_TRIP },
-              },
-            },
-          ],
-        }),
+        new TransactWriteCommand({ TransactItems: itemCreateWrites(deps, tripId, item) }),
       ),
     );
     return { item };
@@ -201,6 +216,8 @@ export async function deleteItem(
                 TableName: deps.tableName,
                 Key: keys.tripMeta(tripId),
                 UpdateExpression: "SET itemCount = itemCount - :one",
+                // 旅が消えていたら書かない(消えた旅の META を作り直さないように)
+                ConditionExpression: "attribute_exists(PK)",
                 ExpressionAttributeValues: { ":one": 1 },
               },
             },

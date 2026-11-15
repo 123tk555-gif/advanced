@@ -1,10 +1,18 @@
 export {
+  type CommentCreate,
+  commentCreate,
   compareOrderKey,
+  type IdeaAdopt,
+  type IdeaCreate,
   type ItemCreate,
   type ItemPatch,
+  ideaAdopt,
+  ideaCreate,
   isValidOrderKey,
   itemCreate,
   itemPatch,
+  MAX_COMMENTS_PER_ITEM,
+  MAX_IDEAS_PER_TRIP,
   MAX_ITEMS_PER_TRIP,
   type Place,
 } from "./items.js";
@@ -16,7 +24,16 @@ export {
   type ProfileInput,
   profileInput,
   type TripInput,
+  transferInput,
   tripDays,
   tripInput,
 } from "./schemas.js";
-export { type Expense, settle, type Transfer } from "./settlement.js";
+export {
+  type Expense,
+  type ExpenseCreate,
+  expenseCreate,
+  MAX_EXPENSE_AMOUNT,
+  MAX_EXPENSES_PER_TRIP,
+  settle,
+  type Transfer,
+} from "./settlement.js";

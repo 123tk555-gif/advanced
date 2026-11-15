@@ -68,3 +68,27 @@ export const itemPatch = z
     message: "変える項目がありません",
   });
 export type ItemPatch = z.infer<typeof itemPatch>;
+
+// ---- 行きたい場所の候補 ----
+
+/** 1 つの旅の候補の上限 */
+export const MAX_IDEAS_PER_TRIP = 100;
+
+export const ideaCreate = z.object({
+  name: z.string().trim().min(1).max(100),
+  place: placeSchema.nullable().optional().default(null),
+  note: z.string().trim().max(100).optional().default(""),
+});
+export type IdeaCreate = z.infer<typeof ideaCreate>;
+
+/** 候補を旅程に入れるとき: どの日の、どの並び位置に入れるか */
+export const ideaAdopt = z.object({ day: fields.day, order: fields.order });
+export type IdeaAdopt = z.infer<typeof ideaAdopt>;
+
+// ---- コメント ----
+
+/** 1 つの予定のコメントの上限 */
+export const MAX_COMMENTS_PER_ITEM = 200;
+
+export const commentCreate = z.object({ body: z.string().trim().min(1).max(200) });
+export type CommentCreate = z.infer<typeof commentCreate>;

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /** 1 件の支出。金額は円(整数) */
 export interface Expense {
   amount: number;
@@ -67,3 +69,23 @@ function validate(expense: Expense): void {
     throw new RangeError("分け合う人を 1 人以上選んでください");
   }
 }
+
+// ---- 入力のルール(画面と API で共通) ----
+
+/** 1 つの旅の支出の上限 */
+export const MAX_EXPENSES_PER_TRIP = 500;
+/** 1 件の支出の金額の上限(円) */
+export const MAX_EXPENSE_AMOUNT = 10_000_000;
+
+export const expenseCreate = z.object({
+  title: z.string().trim().min(1).max(50),
+  amount: z.number().int().min(1).max(MAX_EXPENSE_AMOUNT),
+  paidBy: z.string().min(1),
+  // 同じ人が 2 回あっても 1 人にまとめる(並び順は保つ)
+  splitWith: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(100)
+    .transform((ids) => [...new Set(ids)]),
+});
+export type ExpenseCreate = z.infer<typeof expenseCreate>;

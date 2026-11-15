@@ -1,4 +1,5 @@
 import { DeleteTableCommand } from "@aws-sdk/client-dynamodb";
+import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { afterAll, beforeAll } from "vitest";
 import { createApp } from "../src/app.js";
 import { createDocClient } from "../src/db/client.js";
@@ -87,7 +88,24 @@ export function useTestApi() {
     if (ok.status !== 200) throw new Error(`approve failed: ${ok.status}`);
   }
 
-  return { app, call, signUp, createTrip, addMember, clock };
+  /** テスト用: 旅のデータのうち、SK が prefix で始まる項目の数(API からは見えない後片付けの確認用) */
+  async function countRecords(tripId: string, prefix: string) {
+    const res = await db.send(
+      new QueryCommand({
+        TableName: tableName,
+        KeyConditionExpression: prefix ? "PK = :pk AND begins_with(SK, :prefix)" : "PK = :pk",
+        ExpressionAttributeValues: {
+          ":pk": `TRIP#${tripId}`,
+          ...(prefix ? { ":prefix": prefix } : {}),
+        },
+        Select: "COUNT",
+        ConsistentRead: true,
+      }),
+    );
+    return res.Count ?? 0;
+  }
+
+  return { app, call, signUp, createTrip, addMember, clock, countRecords };
 }
 
 /** 正しい旅の作成内容(テストで一部だけ変えて使う) */

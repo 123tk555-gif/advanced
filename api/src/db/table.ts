@@ -46,12 +46,31 @@ export const keys = {
     GSI1PK: `USER#${userId}`,
     GSI1SK: `TRIP#${joinedAt}#${tripId}`,
   }),
+  /** 自分の参加申請の一覧用(GSI1)。メンバーの GSI1SK(TRIP#…)と前置きで区別する */
+  joinRequestGsi: (userId: string, requestedAt: string, tripId: string) => ({
+    GSI1PK: `USER#${userId}`,
+    GSI1SK: `JOINREQ#${requestedAt}#${tripId}`,
+  }),
   joinRequest: (tripId: string, userId: string) => ({
     PK: `TRIP#${tripId}`,
     SK: `JOINREQ#${userId}`,
   }),
   item: (tripId: string, itemId: string) => ({ PK: `TRIP#${tripId}`, SK: `ITEM#${itemId}` }),
+  idea: (tripId: string, ideaId: string) => ({ PK: `TRIP#${tripId}`, SK: `IDEA#${ideaId}` }),
+  vote: (tripId: string, ideaId: string, userId: string) => ({
+    PK: `TRIP#${tripId}`,
+    SK: `VOTE#${ideaId}#${userId}`,
+  }),
+  expense: (tripId: string, expenseId: string) => ({
+    PK: `TRIP#${tripId}`,
+    SK: `EXP#${expenseId}`,
+  }),
+  comment: (tripId: string, itemId: string, commentId: string) => ({
+    PK: `TRIP#${tripId}`,
+    SK: `CMT#${itemId}#${commentId}`,
+  }),
   invite: (token: string) => ({ PK: `INVITE#${token}`, SK: "INVITE" }),
+  publicLink: (token: string) => ({ PK: `PUBLIC#${token}`, SK: "PUBLIC" }),
   tripPk: (tripId: string) => `TRIP#${tripId}`,
   userPk: (userId: string) => `USER#${userId}`,
 };

@@ -1,11 +1,25 @@
 import { zValidator } from "@hono/zod-validator";
-import { itemCreate, itemPatch, profileInput, tripInput } from "@tritri/shared";
+import {
+  commentCreate,
+  expenseCreate,
+  ideaAdopt,
+  ideaCreate,
+  itemCreate,
+  itemPatch,
+  profileInput,
+  transferInput,
+  tripInput,
+} from "@tritri/shared";
 import { type Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createMiddleware } from "hono/factory";
 import { secureHeaders } from "hono/secure-headers";
 import type { ZodType } from "zod";
 import type { AppEnv, Deps } from "./context.js";
+import { withdraw } from "./repo/account.js";
+import { createComment, deleteComment, deleteCommentsOfItem } from "./repo/comments.js";
+import { createExpense, deleteExpense } from "./repo/expenses.js";
+import { adoptIdea, createIdea, deleteIdea, unvote, vote } from "./repo/ideas.js";
 import {
   approveJoin,
   findTripIdByInvite,
@@ -16,8 +30,22 @@ import {
   requestJoin,
 } from "./repo/invites.js";
 import { createItem, deleteItem, type Item, updateItem } from "./repo/items.js";
+import {
+  deleteTrip,
+  propagateDisplayName,
+  removeMember,
+  transferOwner,
+  updateTrip,
+} from "./repo/manage.js";
 import { getProfile, putProfile } from "./repo/profiles.js";
-import { createTrip, getMember, getTripView, listMyTrips } from "./repo/trips.js";
+import { getPublicView, replacePublicLink } from "./repo/public.js";
+import {
+  createTrip,
+  getMember,
+  getTripView,
+  listMyPendingTrips,
+  listMyTrips,
+} from "./repo/trips.js";
 
 /** 入力の検証。失敗したら 400 と、どの項目がなぜ駄目かを返す */
 const validJson = <T extends ZodType>(schema: T) =>
@@ -48,7 +76,14 @@ export function createApp(deps: Deps) {
     }),
   );
 
-  // すべての API でログインを確かめる(公開しおりの API を足すときは、これより前に置く)
+  // ---- 公開しおり(ログイン不要。ログイン確認より前に登録する) ----
+  // ここより前に置いた API は、test/security.test.ts の PUBLIC_ROUTES に載せること
+  app.get("/public/:token", async (c) => {
+    const view = await getPublicView(deps, c.req.param("token"));
+    return view ? c.json(view) : c.json(notFound, 404);
+  });
+
+  // すべての API でログインを確かめる
   app.use("*", async (c, next) => {
     const userId = deps.resolveUserId(c);
     if (!userId) return c.json({ error: "UNAUTHORIZED" }, 401);
@@ -85,7 +120,13 @@ export function createApp(deps: Deps) {
   app.put("/me", validJson(profileInput), async (c) => {
     const profile = { userId: c.get("userId"), displayName: c.req.valid("json").displayName };
     await putProfile(deps, profile);
+    await propagateDisplayName(deps, profile.userId, profile.displayName);
     return c.json(profile);
+  });
+
+  app.delete("/me", async (c) => {
+    await withdraw(deps, c.get("userId"));
+    return c.body(null, 204);
   });
 
   // ---- 旅 ----
@@ -96,12 +137,53 @@ export function createApp(deps: Deps) {
   });
 
   app.get("/trips", async (c) => {
-    return c.json({ trips: await listMyTrips(deps, c.get("userId")) });
+    const userId = c.get("userId");
+    const [trips, pending] = await Promise.all([
+      listMyTrips(deps, userId),
+      listMyPendingTrips(deps, userId),
+    ]);
+    return c.json({ trips, pending });
   });
 
   app.get("/trips/:tripId", async (c) => {
     const view = await getTripView(deps, c.req.param("tripId"), c.get("member"));
     return view ? c.json(view) : c.json(notFound, 404);
+  });
+
+  app.patch("/trips/:tripId", ownerOnly, validJson(tripInput), async (c) => {
+    const result = await updateTrip(deps, c.req.param("tripId"), c.req.valid("json"));
+    if ("trip" in result) return c.json(result);
+    return result.error === "not_found"
+      ? c.json(notFound, 404)
+      : c.json({ error: "ITEMS_OUT_OF_RANGE" }, 409);
+  });
+
+  app.delete("/trips/:tripId", ownerOnly, async (c) => {
+    const result = await deleteTrip(deps, c.req.param("tripId"), c.get("member"));
+    return result === "deleted" ? c.body(null, 204) : c.json({ error: "CONFLICT" }, 409);
+  });
+
+  // ---- メンバーの管理 ----
+  app.delete("/trips/:tripId/members/:userId", ownerOnly, async (c) => {
+    const { tripId, userId } = c.req.param();
+    if (userId === c.get("userId")) return c.json({ error: "CANNOT_REMOVE_SELF" }, 400);
+    const result = await removeMember(deps, tripId, userId);
+    return result === "removed" ? c.body(null, 204) : c.json(notFound, 404);
+  });
+
+  app.post("/trips/:tripId/leave", async (c) => {
+    if (c.get("member").role === "owner") return c.json({ error: "OWNER_MUST_TRANSFER" }, 409);
+    await removeMember(deps, c.req.param("tripId"), c.get("userId"));
+    return c.body(null, 204);
+  });
+
+  app.post("/trips/:tripId/transfer", ownerOnly, validJson(transferInput), async (c) => {
+    const to = c.req.valid("json").userId;
+    if (to === c.get("userId")) return c.json({ error: "CANNOT_TRANSFER_TO_SELF" }, 400);
+    const result = await transferOwner(deps, c.req.param("tripId"), c.get("member"), to);
+    if (result === "not_found") return c.json(notFound, 404);
+    if (result === "conflict") return c.json({ error: "CONFLICT" }, 409);
+    return c.body(null, 204);
   });
 
   // ---- 招待リンクと参加申請 ----
@@ -146,6 +228,15 @@ export function createApp(deps: Deps) {
 
   app.delete("/trips/:tripId/invite", ownerOnly, async (c) => {
     await replaceInvite(deps, c.req.param("tripId"), null);
+    return c.body(null, 204);
+  });
+
+  app.post("/trips/:tripId/public", ownerOnly, async (c) => {
+    return c.json({ public: await replacePublicLink(deps, c.req.param("tripId"), "new") });
+  });
+
+  app.delete("/trips/:tripId/public", ownerOnly, async (c) => {
+    await replacePublicLink(deps, c.req.param("tripId"), null);
     return c.body(null, 204);
   });
 
@@ -194,10 +285,98 @@ export function createApp(deps: Deps) {
     }
     const { tripId, itemId } = c.req.param();
     const result = await deleteItem(deps, tripId, itemId, Number(version));
-    if ("deleted" in result) return c.body(null, 204);
+    if ("deleted" in result) {
+      await deleteCommentsOfItem(deps, tripId, itemId); // 後片付け: その予定のコメント
+      return c.body(null, 204);
+    }
     return result.error === "not_found"
       ? c.json(notFound, 404)
       : c.json({ error: "VERSION_CONFLICT", current: result.current }, 409);
+  });
+
+  // ---- コメント ----
+  app.post("/trips/:tripId/items/:itemId/comments", validJson(commentCreate), async (c) => {
+    const { tripId, itemId } = c.req.param();
+    const result = await createComment(deps, tripId, itemId, c.get("member"), c.req.valid("json"));
+    if ("comment" in result) return c.json(result, 201);
+    return result.error === "not_found"
+      ? c.json(notFound, 404)
+      : c.json({ error: "TOO_MANY_COMMENTS" }, 409);
+  });
+
+  app.delete("/trips/:tripId/items/:itemId/comments/:commentId", async (c) => {
+    const { tripId, itemId, commentId } = c.req.param();
+    const result = await deleteComment(deps, tripId, itemId, commentId, c.get("member"));
+    if (result === "not_found") return c.json(notFound, 404);
+    if (result === "forbidden") return c.json({ error: "FORBIDDEN" }, 403);
+    return c.body(null, 204);
+  });
+
+  // ---- 行きたい場所の候補 ----
+  app.post("/trips/:tripId/ideas", validJson(ideaCreate), async (c) => {
+    const result = await createIdea(
+      deps,
+      c.req.param("tripId"),
+      c.get("userId"),
+      c.req.valid("json"),
+    );
+    return "idea" in result ? c.json(result, 201) : c.json({ error: "TOO_MANY_IDEAS" }, 409);
+  });
+
+  app.delete("/trips/:tripId/ideas/:ideaId", async (c) => {
+    const { tripId, ideaId } = c.req.param();
+    const result = await deleteIdea(deps, tripId, ideaId, c.get("member"));
+    if (result === "not_found") return c.json(notFound, 404);
+    if (result === "forbidden") return c.json({ error: "FORBIDDEN" }, 403);
+    return c.body(null, 204);
+  });
+
+  app.put("/trips/:tripId/ideas/:ideaId/vote", async (c) => {
+    const { tripId, ideaId } = c.req.param();
+    const result = await vote(deps, tripId, ideaId, c.get("userId"));
+    return result === "ok" ? c.body(null, 204) : c.json(notFound, 404);
+  });
+
+  app.delete("/trips/:tripId/ideas/:ideaId/vote", async (c) => {
+    const { tripId, ideaId } = c.req.param();
+    await unvote(deps, tripId, ideaId, c.get("userId"));
+    return c.body(null, 204);
+  });
+
+  app.post("/trips/:tripId/ideas/:ideaId/adopt", validJson(ideaAdopt), async (c) => {
+    const { tripId, ideaId } = c.req.param();
+    const result = await adoptIdea(deps, tripId, ideaId, c.get("userId"), c.req.valid("json"));
+    if ("item" in result) return c.json(result, 201);
+    switch (result.error) {
+      case "not_found":
+        return c.json(notFound, 404);
+      case "day_out_of_range":
+        return c.json({ error: "DAY_OUT_OF_RANGE" }, 400);
+      case "too_many":
+        return c.json({ error: "TOO_MANY_ITEMS" }, 409);
+      case "already_adopted":
+        return c.json({ error: "ALREADY_ADOPTED" }, 409);
+    }
+  });
+
+  // ---- 割り勘 ----
+  app.post("/trips/:tripId/expenses", validJson(expenseCreate), async (c) => {
+    const result = await createExpense(
+      deps,
+      c.req.param("tripId"),
+      c.get("userId"),
+      c.req.valid("json"),
+    );
+    if ("expense" in result) return c.json(result, 201);
+    return result.error === "not_a_member"
+      ? c.json({ error: "NOT_A_MEMBER" }, 400)
+      : c.json({ error: "TOO_MANY_EXPENSES" }, 409);
+  });
+
+  app.delete("/trips/:tripId/expenses/:expenseId", async (c) => {
+    const { tripId, expenseId } = c.req.param();
+    const result = await deleteExpense(deps, tripId, expenseId);
+    return result === "deleted" ? c.body(null, 204) : c.json(notFound, 404);
   });
 
   app.notFound((c) => c.json(notFound, 404));

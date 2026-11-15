@@ -9,7 +9,7 @@ import { useTestApi } from "./helpers.js";
 const api = useTestApi();
 
 /** ログインなしで使ってよい API(公開しおりを作るときに足す) */
-const PUBLIC_ROUTES: string[] = [];
+const PUBLIC_ROUTES: string[] = ["/public/:token"];
 
 let tripId = "";
 
@@ -47,6 +47,8 @@ describe("ルートの棚卸し", () => {
     const routes = listRoutes().map((r) => `${r.method} ${r.path}`);
     expect(routes).toContain("GET /trips/:tripId");
     expect(routes).toContain("POST /trips/:tripId/join-requests/:userId/approve");
+    // 許可リストの API が実在すること(消したのにリストに残っていないか)
+    for (const path of PUBLIC_ROUTES) expect(routes.some((r) => r.endsWith(` ${path}`))).toBe(true);
   });
 
   it("公開 API 以外は、ログインしていないと 401", async () => {
