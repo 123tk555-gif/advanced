@@ -16,8 +16,13 @@ const days = computed(() => daysOf(props.view.trip));
 const mapDay = ref(1);
 const mapMode = ref<Mode>("walk");
 const mobileView = ref<"list" | "map">("list");
+const { leg } = useLegs();
+const { google } = useGeo();
 
-/** 日ごとの予定と、地図のピン番号・前の場所からの移動時間 */
+/**
+ * 日ごとの予定と、地図のピン番号・前の場所からの移動時間。
+ * 移動時間は、地図で選んでいる日だけ出す(経路検索の料金の枠を使い過ぎないように)
+ */
 const dayBlocks = computed(() =>
   Array.from({ length: days.value }, (_, i) => {
     const day = i + 1;
@@ -26,12 +31,20 @@ const dayBlocks = computed(() =>
     const items = props.view.items
       .filter((it) => it.day === day)
       .map((it) => {
-        const leg = it.place && prev ? fmtMinutes(legMinutes(prev, it.place, mapMode.value)) : null;
+        let legLine: { text: string; href: string | null; timed: boolean } | null = null;
+        if (it.place && prev && day === mapDay.value) {
+          const state = leg(prev, it.place, mapMode.value);
+          legLine = {
+            text: legSentence(state, mapMode.value),
+            href: needsLookupLink(state) ? googleRouteUrl([prev, it.place], mapMode.value) : null,
+            timed: state.status === "ok",
+          };
+        }
         if (it.place) {
           pin += 1;
           prev = it.place;
         }
-        return { ...it, pin: it.place ? pin : null, leg };
+        return { ...it, pin: it.place ? pin : null, leg: legLine };
       });
     return { day, date: fmtDay(dateOf(props.view.trip.startDate, i)), items };
   }),
@@ -176,7 +189,15 @@ function nameOf(userId: string) {
             <template v-for="it in block.items" :key="it.itemId">
               <li :id="`item-${it.itemId}`" class="item">
                 <div v-if="it.leg" class="leg leg-in">
-                  ↓ 前の場所から{{ MODES[mapMode] }}で{{ it.leg }}
+                  ↓ 前の場所から{{ it.leg.text }}
+                  <a v-if="it.leg.href" :href="it.leg.href" target="_blank" rel="noopener"
+                    >Google マップで調べる<span class="visually-hidden"
+                      >({{ it.title }}まで、新しいタブ)</span
+                    ></a
+                  >
+                  <span v-else-if="google && it.leg.timed" class="gmaps-credit" translate="no"
+                    >Google Maps</span
+                  >
                 </div>
                 <div class="item-main">
                   <span>
@@ -187,7 +208,7 @@ function nameOf(userId: string) {
                   <span class="item-time">{{ it.time || "--:--" }}</span>
                   <div>
                     <div class="item-title">{{ it.title }}</div>
-                    <div v-if="it.place" class="item-place">場所: {{ it.place.name }}</div>
+                    <div v-if="it.place" class="item-place">場所: {{ it.place.label }}</div>
                   </div>
                 </div>
                 <div class="item-tools">

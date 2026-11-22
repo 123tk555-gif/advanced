@@ -32,7 +32,7 @@ const newItem = (change: Record<string, unknown> = {}) => ({
   order: first,
   time: "09:00",
   title: "清水寺",
-  place: { name: "清水寺", placeId: "ChIJB_vchdMIAWARujTEUIZlr2I", lat: 34.9949, lng: 135.785 },
+  place: { label: "清水寺", placeId: "ChIJB_vchdMIAWARujTEUIZlr2I" },
   memo: "朝のうちに",
   ...change,
 });
@@ -87,8 +87,17 @@ describe("予定の追加(POST /trips/:tripId/items)", () => {
     ["タイトルが空", { title: "  " }],
     ["タイトルが 101 文字", { title: "あ".repeat(101) }],
     ["メモが 1001 文字", { memo: "あ".repeat(1001) }],
-    ["緯度が範囲外", { place: { name: "どこか", lat: 91, lng: 0 } }],
-    ["場所の名前が空", { place: { name: "", lat: 0, lng: 0 } }],
+    [
+      "場所に座標がある(Google の規約で保存できない)",
+      { place: { label: "清水", placeId: "p-1", lat: 34.99, lng: 135.78 } },
+    ],
+    [
+      "場所に Google の名前がある(保存しない)",
+      { place: { label: "清水", placeId: "p-1", name: "清水寺" } },
+    ],
+    ["場所の ID が無い", { place: { label: "清水" } }],
+    ["場所の ID が空", { place: { label: "清水", placeId: "" } }],
+    ["場所の表示名が空", { place: { label: " ", placeId: "p-1" } }],
     ["並び順が空", { order: "" }],
     ["並び順の形が違う", { order: "!!" }],
   ])("内容が正しくない(%s)と 400", async (_label, change) => {

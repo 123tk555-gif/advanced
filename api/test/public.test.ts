@@ -16,7 +16,7 @@ async function tripWithItem() {
     day: 1,
     order: generateKeyBetween(null, null),
     title: "清水寺",
-    place: { name: "清水寺", lat: 34.9949, lng: 135.785 },
+    place: { label: "清水寺", placeId: "p-kiyomizu" },
     memo: "朝いち",
   });
   return trip;
@@ -52,7 +52,7 @@ describe("公開しおり", () => {
         order: expect.any(String),
         time: "",
         title: "清水寺",
-        place: { name: "清水寺", lat: 34.9949, lng: 135.785 },
+        place: { label: "清水寺", placeId: "p-kiyomizu" },
         memo: "朝いち",
       },
     ]);

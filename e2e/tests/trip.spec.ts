@@ -9,7 +9,7 @@ test("旅を作り、場所つきの予定を足すと、一覧と地図に出�
   await addItem(taro, 1, "伏見稲荷大社", "伏見稲荷");
 
   // 地図に 2 つのピンと、区間の移動時間が出る
-  await expect(taro.getByRole("img", { name: /1日目の地図.*京都駅.*伏見稲荷大社/ })).toBeVisible();
+  await expect(taro.getByRole("img", { name: /1日目の地図.*京都駅.*伏見稲荷/ })).toBeVisible();
   await expect(taro.locator(".map-legs li")).toHaveCount(1);
 
   // 再読み込みしても残っている(サーバーに保存されている)
@@ -168,4 +168,46 @@ test("メンバーでない人が旅の URL を開いても、「見つかりま
 test("ログインしていない人が旅の一覧を開くと、ログイン画面になる", async ({ page }) => {
   await page.goto("/trips");
   await expect(page.getByRole("heading", { level: 1, name: /ログイン/ })).toBeVisible();
+});
+
+test("場所は入力した文字と ID だけを保存し、表示名は自分で変えられる", async ({ browser }) => {
+  const taro = await openAs(browser, "たろう");
+  await createTrip(taro, "場所の保存の旅");
+  await taro.getByRole("button", { name: /予定を追加.*1日目/ }).click();
+  const dialog = taro.getByRole("dialog");
+  await dialog.getByLabel("タイトル").fill("お参り");
+  await dialog.getByRole("combobox", { name: /場所/ }).fill("伏見");
+  await dialog.getByRole("option", { name: "伏見稲荷大社" }).click();
+  // 候補の名前ではなく、入力した文字が入っている
+  const label = dialog.getByRole("textbox", { name: /場所/ });
+  await expect(label).toHaveValue("伏見");
+  await label.fill("お稲荷さん");
+
+  const saved = taro.waitForRequest((r) => r.method() === "POST" && r.url().endsWith("/items"));
+  await dialog.getByRole("button", { name: "保存する" }).click();
+  expect((await saved).postDataJSON().place).toEqual({
+    label: "お稲荷さん",
+    placeId: "fake:伏見稲荷大社",
+  });
+  await expect(taro.locator(".item-place")).toHaveText("場所: お稲荷さん");
+  await taro.reload();
+  await expect(taro.getByRole("img", { name: /1日目の地図.*お稲荷さん/ })).toBeVisible();
+});
+
+test("公共交通は目安の時間を出さず、Google マップで調べるリンクを出す", async ({ browser }) => {
+  const taro = await openAs(browser, "たろう");
+  await createTrip(taro, "公共交通の旅");
+  await addItem(taro, 1, "集合", "京都駅");
+  await addItem(taro, 1, "お参り", "伏見稲荷");
+  await taro.getByRole("button", { name: "公共交通", exact: true }).click();
+
+  const leg = taro.locator(".map-legs li");
+  await expect(leg).toContainText("時間はここでは出せません");
+  await expect(leg).not.toContainText("約");
+  const link = leg.getByRole("link", { name: /Google マップで調べる/ });
+  await expect(link).toHaveAttribute("href", /travelmode=transit/);
+  await expect(link).toHaveAttribute("href", /origin_place_id=/);
+  await expect(
+    taro.locator(".leg-in").getByRole("link", { name: /Google マップで調べる/ }),
+  ).toBeVisible();
 });

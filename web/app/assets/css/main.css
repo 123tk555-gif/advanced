@@ -878,3 +878,42 @@ h1:focus {
   padding: 6px 12px 0;
   border-bottom: 1px dashed var(--border);
 }
+
+/* ---- Google マップ ---- */
+.route-map {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.error-text {
+  color: var(--danger);
+}
+/* Google の帰属表示(書体・太さ・大きさ・色は Places API の方針で決まっている) */
+.gmaps-credit {
+  font-family: Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: #1f1f1f;
+  white-space: nowrap;
+}
+p.gmaps-credit {
+  margin: 2px 0;
+  text-align: right;
+}
+.leg .gmaps-credit {
+  margin-left: 8px;
+}
+:root[data-theme="dark"] .gmaps-credit {
+  color: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .gmaps-credit {
+    color: #fff;
+  }
+}
+/* 候補の名前と住所の間を空ける */
+.suggestions li .muted {
+  margin-left: 8px;
+}

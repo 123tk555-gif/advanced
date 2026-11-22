@@ -1,4 +1,6 @@
 import type { Place } from "~/types/api";
+import type { LegState } from "./geo/legs";
+import type { LatLng } from "./geo/types";
 
 /** 移動手段 */
 export const MODES = { walk: "徒歩", transit: "公共交通", car: "車" } as const;
@@ -9,45 +11,69 @@ export const GOOGLE_MODES: Record<Mode, string> = {
   car: "driving",
 };
 
-function distanceKm(a: Place, b: Place): number {
-  const rad = (x: number) => (x * Math.PI) / 180;
-  const dLat = rad(b.lat - a.lat);
-  const dLng = rad(b.lng - a.lng);
-  const h =
-    Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 6371 * 2 * Math.asin(Math.sqrt(h));
-}
-
-/** 移動時間の目安(分)。Google マップをつなぐ段階で、Routes API の結果に置き換える */
-export function legMinutes(a: Place, b: Place, mode: Mode): number {
-  const km = distanceKm(a, b) * 1.3;
-  if (mode === "walk") return Math.max(1, Math.round((km / 4.5) * 60));
-  if (mode === "car") return Math.max(3, Math.round((km / 22) * 60) + 3);
-  return Math.max(5, Math.round((km / 20) * 60) + 8);
+/** 地図に立てるピン。no は、その日の場所のある予定の中での番号 */
+export interface MapPin extends LatLng {
+  no: number;
+  label: string;
 }
 
 export function fmtMinutes(min: number): string {
   return min >= 60 ? `約 ${Math.floor(min / 60)} 時間 ${min % 60} 分` : `約 ${min} 分`;
 }
 
-export function googleSearchUrl(place: Place): string {
-  return `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}`;
+/**
+ * 区間の状態を、画面に出す文にする。
+ * 経路が無いときに目安の数字は出さない(日本の公共交通は Google が経路を返さず、目安では乗換も待ち時間も入らない)
+ */
+export function legText(state: LegState): string {
+  if (state.status === "loading") return "計算中…";
+  if (state.status === "none") return "時間はここでは出せません";
+  if (state.status === "failed") return "時間を取得できませんでした";
+  return fmtMinutes(state.value.minutes);
 }
 
+/** 移動手段つきの文(例: 徒歩で約 12 分、公共交通: 時間はここでは出せません) */
+export function legSentence(state: LegState, mode: Mode): string {
+  return `${MODES[mode]}${state.status === "ok" ? "で" : ": "}${legText(state)}`;
+}
+
+/** 「Google マップで調べる」リンクを出す区間か */
+export function needsLookupLink(state: LegState): boolean {
+  return state.status === "none" || state.status === "failed";
+}
+
+/** その場所を Google マップで開くリンク */
+export function googleSearchUrl(place: Place): string {
+  const url = new URL("https://www.google.com/maps/search/");
+  url.searchParams.set("api", "1");
+  url.searchParams.set("query", place.label);
+  url.searchParams.set("query_place_id", place.placeId);
+  return url.toString();
+}
+
+/** 経路を Google マップで開くリンク(1 日分にも 1 区間にも使う) */
 export function googleRouteUrl(places: Place[], mode: Mode): string | null {
   if (places.length < 2) return null;
-  const ll = (p: Place) => `${p.lat},${p.lng}`;
+  const first = places[0] as Place;
+  const last = places.at(-1) as Place;
+  const middle = places.slice(1, -1);
   const url = new URL("https://www.google.com/maps/dir/");
   url.searchParams.set("api", "1");
-  url.searchParams.set("origin", ll(places[0] as Place));
-  url.searchParams.set("destination", ll(places.at(-1) as Place));
-  if (places.length > 2) url.searchParams.set("waypoints", places.slice(1, -1).map(ll).join("|"));
+  url.searchParams.set("origin", first.label);
+  url.searchParams.set("origin_place_id", first.placeId);
+  url.searchParams.set("destination", last.label);
+  url.searchParams.set("destination_place_id", last.placeId);
+  if (middle.length) {
+    // | は経由地の区切りなので、表示名に入っていたら空白にする
+    url.searchParams.set("waypoints", middle.map((p) => p.label.replaceAll("|", " ")).join("|"));
+    url.searchParams.set("waypoint_place_ids", middle.map((p) => p.placeId).join("|"));
+  }
   url.searchParams.set("travelmode", GOOGLE_MODES[mode]);
   return url.toString();
 }
 
 /** 地図の模型に描く点(ピンと名前の位置)。近くの名前と重なるときは上下にずらす */
-export function layoutPins(places: Place[], width: number, height: number, pad = 40) {
+export function layoutPins(places: MapPin[], width: number, height: number, pad = 40) {
   if (places.length === 0) return [];
   const lats = places.map((p) => p.lat);
   const lngs = places.map((p) => p.lng);
@@ -63,7 +89,7 @@ export function layoutPins(places: Place[], width: number, height: number, pad =
     const x = width / 2 + (p.lng - cx) * kx * scale;
     const y = height / 2 - (p.lat - midLat) * scale;
     const anchor = x > width - 120 ? "end" : "start";
-    const labelWidth = p.name.length * 13 + 20;
+    const labelWidth = p.label.length * 13 + 20;
     const left = anchor === "end" ? x - 16 - labelWidth : x + 16;
     let ly = y + 5;
     for (let tries = 0; tries < 8; tries++) {

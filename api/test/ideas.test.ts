@@ -22,7 +22,7 @@ async function freshTrip() {
 
 const newIdea = (change: Record<string, unknown> = {}) => ({
   name: "平等院",
-  place: { name: "平等院", lat: 34.8893, lng: 135.8077 },
+  place: { label: "平等院", placeId: "p-byodoin" },
   note: "抹茶スイーツも",
   ...change,
 });

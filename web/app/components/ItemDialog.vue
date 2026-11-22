@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ApiError } from "~/composables/useApi";
 import type { Item, Member, Place } from "~/types/api";
+import { placeError } from "~/utils/geo/input";
 
 /**
  * 予定の追加・編集。
@@ -41,7 +42,7 @@ const busy = ref(false);
 
 function fill(from: Draft) {
   draft.value = { ...from, place: from.place ? { ...from.place } : null };
-  placeText.value = from.place?.name ?? "";
+  placeText.value = "";
 }
 
 watch(
@@ -62,51 +63,14 @@ watch(
   { immediate: true },
 );
 
-// ---- 場所の検索(本番は Google の場所検索に置き換える) ----
-const matches = ref<Place[]>([]);
-const active = ref(-1);
-function onPlaceInput() {
-  matches.value = searchPlaces(placeText.value);
-  active.value = -1;
-}
-function choose(p: Place) {
-  draft.value.place = { ...p };
-  placeText.value = p.name;
-  matches.value = [];
-}
-function clearPlace() {
-  draft.value.place = null;
-  placeText.value = "";
-}
-function onPlaceKey(e: KeyboardEvent) {
-  if (!matches.value.length) return;
-  if (e.key === "ArrowDown") {
-    active.value = (active.value + 1) % matches.value.length;
-  } else if (e.key === "ArrowUp") {
-    active.value = (active.value - 1 + matches.value.length) % matches.value.length;
-  } else if (e.key === "Enter" && active.value >= 0) {
-    choose(matches.value[active.value] as Place);
-  } else if (e.key === "Escape") {
-    matches.value = [];
-    e.stopPropagation();
-  } else {
-    return;
-  }
-  e.preventDefault();
-}
-
 function validate(): string[] {
   const found: string[] = [];
   const title = draft.value.title.trim();
   if (!title) found.push("タイトルを入力してください");
   if (title.length > 100) found.push("タイトルは 100 文字までです");
   if (draft.value.memo.length > 1000) found.push("メモは 1000 文字までです");
-  const text = placeText.value.trim();
-  if (text && draft.value.place?.name !== text) {
-    found.push(
-      "場所は候補から選んでください(地図に出すため)。場所を付けないときは空にしてください",
-    );
-  }
+  const placeProblem = placeError(draft.value.place, placeText.value);
+  if (placeProblem) found.push(placeProblem);
   return found;
 }
 
@@ -174,7 +138,7 @@ const fields: [string, (v: Draft) => string][] = [
   ["日にち", (v) => `${v.day}日目`],
   ["時刻", (v) => v.time || "なし"],
   ["タイトル", (v) => v.title],
-  ["場所", (v) => v.place?.name ?? "なし"],
+  ["場所", (v) => v.place?.label ?? "なし"],
   ["メモ", (v) => v.memo || "なし"],
 ];
 function keepMine() {
@@ -216,40 +180,9 @@ function reedit() {
         <label for="it-title">タイトル <span class="hint">100 文字まで</span></label>
         <input id="it-title" v-model="draft.title" type="text" maxlength="100" autofocus />
         <label for="it-place"
-          >場所 <span class="hint">地名を入れると候補が出ます(今は仮の候補。のちに Google の場所検索)</span></label
+          >場所 <span class="hint">地名を入れると候補が出ます。候補から選んでください</span></label
         >
-        <input
-          id="it-place"
-          v-model="placeText"
-          type="search"
-          role="combobox"
-          aria-autocomplete="list"
-          :aria-expanded="matches.length > 0"
-          aria-controls="place-list"
-          :aria-activedescendant="active >= 0 ? `place-opt-${active}` : undefined"
-          autocomplete="off"
-          @input="onPlaceInput"
-          @keydown="onPlaceKey"
-        />
-        <ul id="place-list" class="suggestions" role="listbox" aria-label="場所の候補">
-          <li
-            v-for="(p, i) in matches"
-            :id="`place-opt-${i}`"
-            :key="p.name"
-            role="option"
-            :aria-selected="i === active"
-            @mousedown.prevent="choose(p)"
-          >
-            {{ p.name }}
-          </li>
-        </ul>
-        <p class="small" aria-live="polite">
-          <template v-if="draft.place">
-            地図に出す場所: <strong>{{ draft.place.name }}</strong>
-            <button type="button" class="link small" @click="clearPlace">外す</button>
-          </template>
-          <template v-else>場所は未設定です(地図には出ません)</template>
-        </p>
+        <PlaceInput v-model="draft.place" v-model:text="placeText" input-id="it-place" />
         <label for="it-memo">メモ <span class="hint">1000 文字まで</span></label>
         <textarea id="it-memo" v-model="draft.memo" maxlength="1000" />
         <p v-if="item" class="small muted">

@@ -2,6 +2,7 @@ node_modules/
 dist/
 .output/
 .nuxt/
+.nuxt-e2e/
 cdk.out/
 coverage/
 .env

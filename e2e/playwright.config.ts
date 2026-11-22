@@ -50,7 +50,13 @@ export default defineConfig({
       command: `corepack pnpm --filter @tritri/web exec nuxt dev --port ${WEB_PORT}`,
       url: WEB,
       cwd: "..",
-      env: { NUXT_PUBLIC_API_BASE: `http://127.0.0.1:${API_PORT}` },
+      env: {
+        NUXT_PUBLIC_API_BASE: `http://127.0.0.1:${API_PORT}`,
+        // web/.env に Google マップのキーがあっても、テストでは仮の地図を使う(料金の枠を使わない・結果が毎回同じ)
+        NUXT_PUBLIC_GOOGLE_MAPS_API_KEY: "",
+        // 手元で動いている開発用サーバー(.nuxt を使う)とぶつからないよう、別の作業フォルダを使う
+        NUXT_BUILD_DIR: ".nuxt-e2e",
+      },
       timeout: 180_000,
       reuseExistingServer: false,
     },

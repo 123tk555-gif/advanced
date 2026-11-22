@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { Idea, TripView } from "~/types/api";
+import type { Idea, Place, TripView } from "~/types/api";
+import { placeError } from "~/utils/geo/input";
 
 /** 候補タブ: 行きたい場所の候補・投票・旅程に入れる */
 const props = defineProps<{ view: TripView }>();
@@ -22,23 +23,29 @@ const canDelete = (idea: Idea) =>
 // ---- 候補を出す ----
 const name = ref("");
 const note = ref("");
+const place = ref<Place | null>(null);
+const placeText = ref("");
 const errors = ref<string[]>([]);
 async function propose() {
   const found: string[] = [];
   if (!name.value.trim()) found.push("候補の名前を入力してください");
   if (name.value.trim().length > 100) found.push("候補の名前は 100 文字までです");
   if (note.value.trim().length > 100) found.push("ひとことは 100 文字までです");
+  const placeProblem = placeError(place.value, placeText.value);
+  if (placeProblem) found.push(placeProblem);
   errors.value = found;
   if (found.length) return;
   try {
     await api.post(`/trips/${tripId.value}/ideas`, {
       name: name.value.trim(),
-      place: findPlace(name.value),
+      place: place.value,
       note: note.value.trim(),
     });
     toast(`「${name.value.trim()}」を候補に出しました`);
     name.value = "";
     note.value = "";
+    place.value = null;
+    placeText.value = "";
     emit("changed");
   } catch (error) {
     errors.value = [errorMessage(error)];
@@ -152,18 +159,12 @@ async function adopt() {
       <h2 id="idea-form-title" style="margin-top: 0">候補を出す</h2>
       <form novalidate @submit.prevent="propose">
         <ErrorsBox :errors="errors" />
-        <label for="idea-name">候補の名前 <span class="hint">一覧から選ぶと地図に出せます</span></label>
-        <input
-          id="idea-name"
-          v-model="name"
-          type="text"
-          list="place-names"
-          maxlength="100"
-          autocomplete="off"
-        />
-        <datalist id="place-names">
-          <option v-for="p in PLACES" :key="p.name" :value="p.name" />
-        </datalist>
+        <label for="idea-name">候補の名前 <span class="hint">100 文字まで</span></label>
+        <input id="idea-name" v-model="name" type="text" maxlength="100" autocomplete="off" />
+        <label for="idea-place"
+          >場所 <span class="hint">省略できます。地名を入れて候補から選ぶと、旅程に入れたとき地図に出ます</span></label
+        >
+        <PlaceInput v-model="place" v-model:text="placeText" input-id="idea-place" />
         <label for="idea-note">ひとこと <span class="hint">省略できます。100 文字まで</span></label>
         <input id="idea-note" v-model="note" type="text" maxlength="100" />
         <div class="actions"><button type="submit" class="primary">候補に出す</button></div>

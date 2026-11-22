@@ -67,7 +67,7 @@ const blocks = computed(() =>
                   <span class="item-time">{{ it.time || "--:--" }}</span>
                   <div>
                     <div class="item-title">{{ it.title }}</div>
-                    <div v-if="it.place" class="item-place">場所: {{ it.place.name }}</div>
+                    <div v-if="it.place" class="item-place">場所: {{ it.place.label }}</div>
                     <div v-if="it.memo" class="memo small">{{ it.memo }}</div>
                   </div>
                 </div>

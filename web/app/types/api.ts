@@ -2,11 +2,11 @@
 
 export type Role = "owner" | "member";
 
+/** 保存している場所。座標は持たない(表示のたびに ID から取る) */
 export interface Place {
-  name: string;
-  placeId?: string;
-  lat: number;
-  lng: number;
+  placeId: string;
+  /** 利用者が入力した表示名 */
+  label: string;
 }
 
 export interface Trip {

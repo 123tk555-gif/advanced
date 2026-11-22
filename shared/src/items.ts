@@ -25,11 +25,13 @@ export function compareOrderKey(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-const placeSchema = z.object({
-  name: z.string().trim().min(1).max(200),
-  placeId: z.string().min(1).max(300).optional(),
-  lat: z.number().min(-90).max(90),
-  lng: z.number().min(-180).max(180),
+/**
+ * 場所。保存するのは Google の場所の ID と、利用者が入力した表示名だけ。
+ * 座標と Google の名前は、Google の規約でずっとは保存できないので受け取らない(表示のたびに ID から取る)。
+ */
+const placeSchema = z.strictObject({
+  placeId: z.string().min(1).max(300),
+  label: z.string().trim().min(1).max(200),
 });
 export type Place = z.infer<typeof placeSchema>;
 
