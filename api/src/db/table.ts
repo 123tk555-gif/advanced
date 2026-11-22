@@ -74,3 +74,36 @@ export const keys = {
   tripPk: (tripId: string) => `TRIP#${tripId}`,
   userPk: (userId: string) => `USER#${userId}`,
 };
+
+/** Connections テーブル(WebSocket の接続とチケット)を作る(DynamoDB Local 用) */
+export async function createConnectionsTable(
+  db: DynamoDBDocumentClient,
+  tableName: string,
+): Promise<void> {
+  await db.send(
+    new CreateTableCommand({
+      TableName: tableName,
+      BillingMode: "PAY_PER_REQUEST",
+      AttributeDefinitions: [
+        { AttributeName: "PK", AttributeType: "S" },
+        { AttributeName: "SK", AttributeType: "S" },
+      ],
+      KeySchema: [
+        { AttributeName: "PK", KeyType: "HASH" },
+        { AttributeName: "SK", KeyType: "RANGE" },
+      ],
+    }),
+  );
+}
+
+/** Connections テーブルのキー */
+export const connectionKeys = {
+  tripPk: (tripId: string) => `TRIP#${tripId}`,
+  inTrip: (tripId: string, connectionId: string) => ({
+    PK: `TRIP#${tripId}`,
+    SK: `CONN#${connectionId}`,
+  }),
+  byId: (connectionId: string) => ({ PK: `CONN#${connectionId}`, SK: "CONN" }),
+  ticket: (ticket: string) => ({ PK: `TICKET#${ticket}`, SK: "TICKET" }),
+  seq: (tripId: string) => ({ PK: `TRIP#${tripId}`, SK: "SEQ" }),
+};

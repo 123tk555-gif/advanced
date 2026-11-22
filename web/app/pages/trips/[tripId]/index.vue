@@ -4,8 +4,7 @@ import type { JoinRequest, TripView } from "~/types/api";
 
 /**
  * 旅の画面(旅程・候補・割り勘・メンバーの 4 つのタブ)。
- * ほかの人の変更は、今は 15 秒ごとと、画面に戻ったときに読み直して反映する。
- * (WebSocket をつなぐ段階で、変更がすぐ届くようにする)
+ * ほかの人の変更は WebSocket の合図で読み直す(useTripRealtime)。切れている間は 15 秒ごと。
  */
 const route = useRoute();
 const api = useApi();
@@ -19,6 +18,8 @@ const view = ref<TripView | null>(null);
 const requests = ref<JoinRequest[]>([]);
 const notFound = ref(false);
 const loadError = ref("");
+/** 見られなくなった(外された・抜けた・旅が消えた)。遅れて届いた答えで表示を戻さない */
+let revoked = false;
 
 async function load() {
   try {
@@ -28,9 +29,13 @@ async function load() {
         ? (await api.get<{ requests: JoinRequest[] }>(`/trips/${tripId.value}/join-requests`))
             .requests
         : [];
+    if (revoked) return;
+    const restoreFocus = keepFocus();
     view.value = v;
     notFound.value = false;
     loadError.value = "";
+    await nextTick();
+    restoreFocus();
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       notFound.value = true;
@@ -41,27 +46,19 @@ async function load() {
   }
 }
 await load();
-watch(tripId, load);
+const { state, people, editing, setEditing, reload } = useTripRealtime(tripId.value, {
+  load,
+  onRevoked() {
+    revoked = true;
+    view.value = null;
+    requests.value = [];
+    notFound.value = true;
+  },
+});
 
 useHead(() => ({
   title: `${view.value?.trip.title ?? (notFound.value ? "見つかりません" : "旅")} | Tri-Tri`,
 }));
-
-// ほかの人の変更を取り込む(編集のダイアログを開いている間は読み直さない)
-let timer: ReturnType<typeof setInterval> | undefined;
-function refreshIfIdle() {
-  if (document.visibilityState === "visible" && !document.querySelector("dialog[open]")) {
-    void load();
-  }
-}
-onMounted(() => {
-  timer = setInterval(refreshIfIdle, 15_000);
-  window.addEventListener("focus", refreshIfIdle);
-});
-onBeforeUnmount(() => {
-  clearInterval(timer);
-  window.removeEventListener("focus", refreshIfIdle);
-});
 
 const tabs = [
   { key: "plan", label: "旅程" },
@@ -82,6 +79,7 @@ const tabs = [
       >
       <NuxtLink :to="`/trips/${tripId}/settings`" class="small">旅の設定</NuxtLink>
     </div>
+    <PresenceBar :state="state" :people="people" />
     <p v-if="loadError" class="notice warn" role="status">{{ loadError }}</p>
     <nav class="tabs" aria-label="旅の画面の切り替え">
       <NuxtLink
@@ -99,10 +97,16 @@ const tabs = [
         >
       </NuxtLink>
     </nav>
-    <PlanTab v-if="tab === 'plan'" :view="view" @changed="load" />
-    <IdeasTab v-else-if="tab === 'ideas'" :view="view" @changed="load" />
-    <MoneyTab v-else-if="tab === 'money'" :view="view" @changed="load" />
-    <MembersTab v-else :view="view" :requests="requests" @changed="load" />
+    <PlanTab
+      v-if="tab === 'plan'"
+      :view="view"
+      :editing="editing"
+      @changed="reload"
+      @editing="setEditing"
+    />
+    <IdeasTab v-else-if="tab === 'ideas'" :view="view" @changed="reload" />
+    <MoneyTab v-else-if="tab === 'money'" :view="view" @changed="reload" />
+    <MembersTab v-else :view="view" :requests="requests" @changed="reload" />
   </div>
   <p v-else-if="loadError" class="errors" role="alert">{{ loadError }}</p>
 </template>

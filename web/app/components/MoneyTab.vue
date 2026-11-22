@@ -39,10 +39,14 @@ const splitWith = ref<string[]>(props.view.members.map((m) => m.userId));
 const errors = ref<string[]>([]);
 watch(
   () => props.view.members.map((m) => m.userId).join(","),
-  () => {
-    // メンバーが変わったら、今のメンバーだけを残す
-    const ids = props.view.members.map((m) => m.userId);
-    splitWith.value = splitWith.value.filter((id) => ids.includes(id));
+  (now, before) => {
+    const ids = now.split(",");
+    const previous = before.split(",");
+    // 全員で割るつもりの入力なら、入力中に入った人も加える。人を選んでいたら、その選択は変えない
+    const everyone = previous.every((id) => splitWith.value.includes(id));
+    splitWith.value = ids.filter(
+      (id) => splitWith.value.includes(id) || (everyone && !previous.includes(id)),
+    );
     if (!ids.includes(paidBy.value)) paidBy.value = user.value?.userId ?? ids[0] ?? "";
   },
 );

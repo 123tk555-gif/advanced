@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Editor } from "@tritri/shared";
 import { ApiError } from "~/composables/useApi";
 import type { Item, Member, Place } from "~/types/api";
 import { placeError } from "~/utils/geo/input";
@@ -17,6 +18,8 @@ const props = defineProps<{
   members: readonly Member[];
   /** 編集する予定。null なら追加 */
   item: Item | null;
+  /** この予定を編集中の、ほかの人 */
+  editors: readonly Editor[];
   /** 追加するときの日にち */
   day: number;
 }>();
@@ -161,6 +164,9 @@ function reedit() {
   <AppDialog :open="open" title-id="item-dialog-title" @close="emit('close')">
     <template v-if="state === 'edit'">
       <h2 id="item-dialog-title">{{ item ? "予定を編集" : "予定を追加" }}</h2>
+      <p v-if="editors.length" class="editing-note">
+        {{ editingText(editors) }}。同時に保存すると、どちらの内容にするかを選ぶ画面になります
+      </p>
       <form novalidate @submit.prevent="save()">
         <ErrorsBox :errors="errors" />
         <div class="field-row">

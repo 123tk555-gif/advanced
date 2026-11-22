@@ -217,3 +217,24 @@ export async function propagateDisplayName(
     }
   }
 }
+
+/** その人が関わっている旅(メンバーの旅と、申請中の旅)。表示名の変更・退会を知らせる先 */
+export async function listRelatedTripIds(deps: Deps, userId: string): Promise<string[]> {
+  const ids = new Set<string>();
+  let startKey: Record<string, unknown> | undefined;
+  do {
+    const res = await deps.db.send(
+      new QueryCommand({
+        TableName: deps.tableName,
+        IndexName: GSI1,
+        KeyConditionExpression: "GSI1PK = :pk",
+        ExpressionAttributeValues: { ":pk": keys.userPk(userId) },
+        ProjectionExpression: "PK",
+        ExclusiveStartKey: startKey,
+      }),
+    );
+    for (const { PK } of res.Items ?? []) ids.add(String(PK).slice("TRIP#".length));
+    startKey = res.LastEvaluatedKey;
+  } while (startKey);
+  return [...ids];
+}

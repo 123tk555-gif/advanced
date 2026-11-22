@@ -17,6 +17,17 @@ export {
   type Place,
 } from "./items.js";
 export {
+  type ClientMessage,
+  type Editor,
+  MAX_CLIENT_MESSAGE,
+  PING_INTERVAL_MS,
+  parseClientMessage,
+  parseServerMessage,
+  type ServerMessage,
+  STALE_CONNECTION_MS,
+  type Viewer,
+} from "./realtime.js";
+export {
   INVITE_VALID_DAYS,
   MAX_MEMBERS,
   MAX_PENDING_JOIN_REQUESTS,

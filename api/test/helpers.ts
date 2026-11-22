@@ -3,7 +3,10 @@ import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { afterAll, beforeAll } from "vitest";
 import { createApp } from "../src/app.js";
 import { createDocClient } from "../src/db/client.js";
-import { createTable } from "../src/db/table.js";
+import { createConnectionsTable, createTable } from "../src/db/table.js";
+import { createRealtime } from "../src/realtime/service.js";
+import type { Sender } from "../src/realtime/types.js";
+import { recordingSender } from "./realtime-helpers.js";
 
 /** テストでは、ログイン中の利用者をこのヘッダーで指定する(本番は Cognito の JWT から取る) */
 export const TEST_USER_HEADER = "x-test-user-id";
@@ -12,7 +15,7 @@ export const TEST_USER_HEADER = "x-test-user-id";
  * テストファイルごとに専用のテーブルを作り、そのテーブルを使う API を返す。
  * テストファイル同士が同じデータを触らないようにするため。
  */
-export function useTestApi() {
+export function useTestApi(options: { sender?: Sender } = {}) {
   const db = createDocClient({
     endpoint: process.env.DYNAMODB_ENDPOINT ?? "http://localhost:8000",
   });
@@ -23,22 +26,38 @@ export function useTestApi() {
     advanceDays(days: number) {
       offsetMs += days * 86_400_000;
     },
+    advanceSeconds(seconds: number) {
+      offsetMs += seconds * 1000;
+    },
     reset() {
       offsetMs = 0;
     },
   };
+  const now = () => new Date(Date.now() + offsetMs);
+  const connectionsTable = `${tableName}-connections`;
+  const outbox = recordingSender();
+  const realtime = createRealtime({
+    db,
+    tableName,
+    connectionsTable,
+    now,
+    sender: options.sender ?? outbox.sender,
+  });
   const app = createApp({
     db,
     tableName,
     resolveUserId: (c) => c.req.header(TEST_USER_HEADER),
-    now: () => new Date(Date.now() + offsetMs),
+    now,
+    realtime,
   });
 
   beforeAll(async () => {
     await createTable(db, tableName);
+    await createConnectionsTable(db, connectionsTable);
   });
   afterAll(async () => {
     await db.send(new DeleteTableCommand({ TableName: tableName }));
+    await db.send(new DeleteTableCommand({ TableName: connectionsTable }));
     db.destroy();
   });
 
@@ -105,7 +124,32 @@ export function useTestApi() {
     return res.Count ?? 0;
   }
 
-  return { app, call, signUp, createTrip, addMember, clock, countRecords };
+  /** テスト用: その旅につながっている接続の数 */
+  async function countConnections(tripId: string) {
+    const res = await db.send(
+      new QueryCommand({
+        TableName: connectionsTable,
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+        ExpressionAttributeValues: { ":pk": `TRIP#${tripId}`, ":prefix": "CONN#" },
+        Select: "COUNT",
+        ConsistentRead: true,
+      }),
+    );
+    return res.Count ?? 0;
+  }
+
+  return {
+    app,
+    call,
+    signUp,
+    createTrip,
+    addMember,
+    clock,
+    countRecords,
+    countConnections,
+    realtime,
+    outbox,
+  };
 }
 
 /** 正しい旅の作成内容(テストで一部だけ変えて使う) */

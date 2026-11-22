@@ -26,6 +26,9 @@ let libs: Libs | null = null;
 let map: google.maps.Map | null = null;
 let markers: google.maps.marker.AdvancedMarkerElement[] = [];
 let lines: google.maps.Polyline[] = [];
+/** 利用者が地図を動かした後は、場所の組が変わるまで範囲を合わせ直さない */
+let touched = false;
+let lastPlaces = "";
 
 function token(name: string, fallback: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -94,6 +97,14 @@ function draw() {
     for (const point of path) bounds.extend(point);
   });
 
+  const places = props.pins
+    .map((p) => `${p.lat},${p.lng}`)
+    .sort()
+    .join("|");
+  if (touched && places === lastPlaces) return;
+  touched = false;
+  lastPlaces = places;
+
   const only = props.pins.length === 1 ? props.pins[0] : undefined;
   if (only) {
     map.setCenter({ lat: only.lat, lng: only.lng });
@@ -120,6 +131,9 @@ onMounted(async () => {
       mapTypeControl: false,
       streetViewControl: false,
       clickableIcons: false,
+    });
+    map.addListener("dragstart", () => {
+      touched = true;
     });
     draw();
   } catch {

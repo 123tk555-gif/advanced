@@ -227,7 +227,11 @@ export async function getMember(
   userId: string,
 ): Promise<Member | undefined> {
   const res = await deps.db.send(
-    new GetCommand({ TableName: deps.tableName, Key: keys.member(tripId, userId) }),
+    new GetCommand({
+      TableName: deps.tableName,
+      Key: keys.member(tripId, userId),
+      ConsistentRead: true,
+    }),
   );
   return res.Item ? toMember(res.Item) : undefined;
 }
@@ -269,6 +273,8 @@ export async function loadTripPartition(deps: Deps, tripId: string) {
         KeyConditionExpression: "PK = :pk",
         ExpressionAttributeValues: { ":pk": keys.tripPk(tripId) },
         ExclusiveStartKey: startKey,
+        // 変更の合図の直後に読まれるので、古い内容を返さない
+        ConsistentRead: true,
       }),
     );
     records.push(...(res.Items ?? []));

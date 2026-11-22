@@ -32,6 +32,7 @@ import {
 import { createItem, deleteItem, type Item, updateItem } from "./repo/items.js";
 import {
   deleteTrip,
+  listRelatedTripIds,
   propagateDisplayName,
   removeMember,
   transferOwner,
@@ -111,6 +112,25 @@ export function createApp(deps: Deps) {
     await next();
   });
 
+  /**
+   * 変更の通知。個々の API には書かない(test/notify.test.ts が全 API を確認)。
+   * 通知の失敗で保存は失敗させない(画面は定期的な読み直しでも追いつく)。
+   */
+  async function notify(send: () => Promise<void>) {
+    try {
+      await send();
+    } catch (error) {
+      console.error("変更の通知に失敗しました", error);
+    }
+  }
+  app.use("/trips/:tripId/*", async (c, next) => {
+    const tripId = c.req.param("tripId");
+    await next();
+    if (!tripId || c.req.method === "GET" || !c.res.ok) return;
+    if (c.req.path.endsWith("/ws-ticket")) return; // 旅の中身は変わらない
+    await notify(() => deps.realtime.changed(tripId));
+  });
+
   // ---- プロフィール ----
   app.get("/me", async (c) => {
     const profile = await getProfile(deps, c.get("userId"));
@@ -121,11 +141,21 @@ export function createApp(deps: Deps) {
     const profile = { userId: c.get("userId"), displayName: c.req.valid("json").displayName };
     await putProfile(deps, profile);
     await propagateDisplayName(deps, profile.userId, profile.displayName);
+    await notify(async () => {
+      const tripIds = await listRelatedTripIds(deps, profile.userId);
+      await Promise.all(tripIds.map((id) => deps.realtime.changed(id)));
+    });
     return c.json(profile);
   });
 
   app.delete("/me", async (c) => {
-    await withdraw(deps, c.get("userId"));
+    const userId = c.get("userId");
+    // 退会すると申請中の旅は引けなくなるので、先に控える
+    const tripIds = await listRelatedTripIds(deps, userId);
+    await withdraw(deps, userId);
+    await notify(async () => {
+      await Promise.all(tripIds.map((id) => deps.realtime.withdrawn(id, userId)));
+    });
     return c.body(null, 204);
   });
 
@@ -161,6 +191,12 @@ export function createApp(deps: Deps) {
   app.delete("/trips/:tripId", ownerOnly, async (c) => {
     const result = await deleteTrip(deps, c.req.param("tripId"), c.get("member"));
     return result === "deleted" ? c.body(null, 204) : c.json({ error: "CONFLICT" }, 409);
+  });
+
+  // ---- リアルタイム更新(WebSocket) ----
+  app.post("/trips/:tripId/ws-ticket", async (c) => {
+    const ticket = await deps.realtime.issueTicket(c.req.param("tripId"), c.get("userId"));
+    return ticket ? c.json({ ticket }) : c.json({ error: "REALTIME_UNAVAILABLE" }, 503);
   });
 
   // ---- メンバーの管理 ----
@@ -203,6 +239,7 @@ export function createApp(deps: Deps) {
 
     const result = await requestJoin(deps, tripId, profile);
     if (result === "full") return c.json({ error: "TOO_MANY_JOIN_REQUESTS" }, 409);
+    if (result === "created") await notify(() => deps.realtime.changed(tripId));
     return c.json({ status: "pending" }, result === "created" ? 201 : 200);
   });
 

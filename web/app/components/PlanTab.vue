@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import type { Editor } from "@tritri/shared";
 import { ApiError } from "~/composables/useApi";
 import type { Item, ItemWithComments, Place, TripView } from "~/types/api";
 import type { Mode } from "~/utils/map";
 
 /** 旅程タブ: 日ごとの予定(並べ替え・編集・削除・コメント)と地図 */
-const props = defineProps<{ view: TripView }>();
-const emit = defineEmits<{ changed: [] }>();
+const props = defineProps<{ view: TripView; editing: readonly Editor[] }>();
+const emit = defineEmits<{ changed: []; editing: [itemId: string | null] }>();
 const api = useApi();
 const { toast } = useToast();
 const { confirm } = useConfirm();
@@ -64,6 +65,14 @@ function openAdd(day: number) {
 function openEdit(item: ItemWithComments) {
   dialog.value = { open: true, item, day: item.day };
 }
+// 自分が編集中の予定を、ほかの人に知らせる
+watch(
+  () => (dialog.value.open ? (dialog.value.item?.itemId ?? null) : null),
+  (itemId) => emit("editing", itemId),
+);
+onBeforeUnmount(() => emit("editing", null));
+const editorsOf = (itemId: string) => props.editing.filter((e) => e.itemId === itemId);
+
 function onSaved(itemId: string) {
   dialog.value.open = false;
   const saved = props.view.items.find((i) => i.itemId === itemId);
@@ -208,6 +217,9 @@ function nameOf(userId: string) {
                   <span class="item-time">{{ it.time || "--:--" }}</span>
                   <div>
                     <div class="item-title">{{ it.title }}</div>
+                    <div v-if="editorsOf(it.itemId).length" class="editing-note">
+                      {{ editingText(editorsOf(it.itemId)) }}
+                    </div>
                     <div v-if="it.place" class="item-place">場所: {{ it.place.label }}</div>
                   </div>
                 </div>
@@ -317,6 +329,7 @@ function nameOf(userId: string) {
       :items="view.items"
       :members="view.members"
       :item="dialog.item"
+      :editors="dialog.item ? editorsOf(dialog.item.itemId) : []"
       :day="dialog.day"
       @close="dialog.open = false"
       @saved="onSaved"

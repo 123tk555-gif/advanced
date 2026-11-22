@@ -20,7 +20,9 @@
   "devDependencies": {
     "@types/aws-lambda": "8.10.164",
     "@types/node": "26.6.6",
+    "@types/ws": "8.18.2",
     "fractional-indexing": "4.0.0",
-    "tsx": "4.23.15"
+    "tsx": "4.23.15",
+    "ws": "8.22.1"
   }
 }

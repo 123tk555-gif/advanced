@@ -492,12 +492,52 @@ legend {
   margin-bottom: 0;
 }
 .presence {
+  margin: 4px 0 12px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+.presence-people,
+.presence-people ul {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.presence-people {
+  min-height: 34px;
+}
+.presence-people ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.presence-people li {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  margin: 4px 0 12px;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.presence-status {
+  margin: 0;
+}
+.presence-status.lost {
+  margin-top: 4px;
+  padding: 4px 10px;
+  border-left: 4px solid var(--accent);
+  background: var(--warn-soft);
+  color: var(--warn-text);
+}
+.editing-note {
+  width: fit-content;
+  margin: 4px 0;
+  padding: 0 8px;
+  border: 1px dashed currentColor;
+  border-radius: 6px;
+  background: var(--warn-soft);
+  color: var(--warn-text);
+  font-size: 0.85rem;
+  font-weight: bold;
 }
 .avatar {
   display: inline-grid;

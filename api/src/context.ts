@@ -1,5 +1,6 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { Context } from "hono";
+import type { Notifier } from "./realtime/types.js";
 import type { Member } from "./repo/trips.js";
 
 /** API が外から受け取るもの(テストと本番で差し替える) */
@@ -10,6 +11,8 @@ export interface Deps {
   resolveUserId: (c: Context) => string | undefined;
   /** 今の時刻(テストでは時計を進められるようにする) */
   now: () => Date;
+  /** 変更の通知先(WebSocket) */
+  realtime: Notifier;
 }
 
 export interface AppEnv {
