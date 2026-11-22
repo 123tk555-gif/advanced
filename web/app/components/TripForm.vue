@@ -26,11 +26,11 @@ const model = defineModel<TripFields>({ required: true });
     <div class="field-row">
       <div>
         <label for="tf-start">開始日</label>
-        <input id="tf-start" v-model="model.startDate" type="date" required :disabled="disabled" />
+        <DateInput v-model="model.startDate" input-id="tf-start" name="開始日" :disabled="disabled" />
       </div>
       <div>
         <label for="tf-end">終了日 <span class="hint">{{ MAX_TRIP_DAYS }} 日間まで</span></label>
-        <input id="tf-end" v-model="model.endDate" type="date" required :disabled="disabled" />
+        <DateInput v-model="model.endDate" input-id="tf-end" name="終了日" :disabled="disabled" />
       </div>
     </div>
     <label for="tf-dest">行き先 <span class="hint">省略できます。50 文字まで</span></label>

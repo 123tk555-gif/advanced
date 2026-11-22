@@ -24,8 +24,8 @@ export async function openAs(browser: Browser, name: string): Promise<Page> {
 export async function createTrip(page: Page, title: string) {
   await page.getByRole("link", { name: "旅を作る" }).click();
   await page.getByLabel("タイトル").fill(title);
-  await page.getByLabel("開始日").fill("2027-04-01");
-  await page.getByLabel("終了日").fill("2027-04-03");
+  await page.getByRole("textbox", { name: /^開始日/ }).fill("2027/04/01");
+  await page.getByRole("textbox", { name: /^終了日/ }).fill("2027/04/03");
   await page.getByLabel("行き先").fill("京都");
   await page.getByRole("button", { name: "作る" }).click();
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();

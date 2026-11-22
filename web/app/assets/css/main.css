@@ -333,6 +333,10 @@ textarea {
 textarea {
   min-height: 90px;
 }
+::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
 input[aria-invalid="true"],
 textarea[aria-invalid="true"] {
   border-color: var(--danger);
@@ -341,6 +345,48 @@ textarea[aria-invalid="true"] {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0 12px;
+}
+/* 補足の行がある欄とない欄が並んでも、入力欄の上端をそろえる(ラベルの行と入力欄の行を左右で共有) */
+.field-row > div {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  grid-template-columns: minmax(0, 1fr);
+}
+/* 日付の欄(文字の欄 + カレンダーのボタン) */
+.date-input {
+  position: relative;
+  display: flex;
+  align-self: start;
+}
+.date-input > input[type="text"] {
+  min-width: 0;
+  padding-right: 48px;
+}
+.date-button,
+.date-input > .date-picker {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  min-width: 44px;
+  height: 100%;
+  min-height: 44px;
+  padding: 0;
+}
+.date-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-color: transparent;
+  background: transparent;
+}
+.date-input > .date-picker {
+  opacity: 0;
+  cursor: pointer;
+}
+.date-input > .date-picker:disabled {
+  cursor: default;
 }
 fieldset {
   border: 1px solid var(--border);
