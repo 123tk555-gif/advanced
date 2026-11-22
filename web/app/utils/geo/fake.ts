@@ -6,8 +6,8 @@ import type { LatLng, PlaceSearch, RouteService } from "./types";
  * 場所は決まった一覧から探し、徒歩・車の移動時間は直線距離から出した目安にする。
  * 公共交通は、日本の Google と同じく「経路なし」にする。
  */
-const PLACES: ({ name: string } & LatLng)[] = [
-  { name: "京都駅", lat: 34.9858, lng: 135.7588 },
+const PLACES: ({ name: string; kind?: string } & LatLng)[] = [
+  { name: "京都駅", kind: "駅", lat: 34.9858, lng: 135.7588 },
   { name: "清水寺", lat: 34.9949, lng: 135.785 },
   { name: "伏見稲荷大社", lat: 34.9671, lng: 135.7727 },
   { name: "金閣寺(鹿苑寺)", lat: 35.0394, lng: 135.7292 },
@@ -22,15 +22,24 @@ const PLACES: ({ name: string } & LatLng)[] = [
   { name: "哲学の道", lat: 35.023, lng: 135.7945 },
   { name: "平等院", lat: 34.8893, lng: 135.8077 },
   { name: "京都タワー", lat: 34.9875, lng: 135.7594 },
-  { name: "那覇空港", lat: 26.206, lng: 127.6466 },
+  { name: "那覇空港", kind: "空港", lat: 26.206, lng: 127.6466 },
   { name: "首里城公園", lat: 26.217, lng: 127.7195 },
   { name: "国際通り", lat: 26.2155, lng: 127.689 },
   { name: "沖縄美ら海水族館", lat: 26.6943, lng: 127.8779 },
   { name: "古宇利大橋", lat: 26.6941, lng: 128.0193 },
   { name: "万座毛", lat: 26.505, lng: 127.8506 },
+  { name: "清水道", kind: "バス停", lat: 34.9977, lng: 135.7779 },
+  { name: "京都駅八条口", kind: "バス停", lat: 34.9844, lng: 135.7586 },
+  { name: "京都駅中央口", kind: "バス停", lat: 34.9868, lng: 135.7589 },
+  { name: "京都タワー前", kind: "バス停", lat: 34.9872, lng: 135.7597 },
+  { name: "京都河原町駅", kind: "駅", lat: 35.0037, lng: 135.7687 },
+  { name: "京都市役所前駅", kind: "駅", lat: 35.0111, lng: 135.7683 },
+  { name: "京都水族館前", kind: "バス停", lat: 34.9879, lng: 135.7477 },
+  { name: "京都国際会館駅", kind: "駅", lat: 35.0627, lng: 135.7846 },
 ];
 
 const PREFIX = "fake:";
+const RESOLVE_DELAY_MS = 400;
 
 function positionOf(placeId: string): LatLng | null {
   const p = PLACES.find((x) => `${PREFIX}${x.name}` === placeId);
@@ -42,10 +51,16 @@ export const fakePlaces: PlaceSearch = {
     const q = text.trim();
     if (!q) return [];
     return PLACES.filter((p) => p.name.includes(q))
-      .slice(0, 8)
-      .map((p) => ({ id: `${PREFIX}${p.name}`, main: p.name }));
+      .slice(0, 10)
+      .map((p) => ({
+        id: `${PREFIX}${p.name}`,
+        main: p.name,
+        ...(p.kind ? { kind: p.kind } : {}),
+      }));
   },
   async resolve(suggestion) {
+    // 本物の Google と同じく待ち時間を入れる(待っている間の操作の不具合をテストで拾うため)
+    await new Promise((resolve) => setTimeout(resolve, RESOLVE_DELAY_MS));
     const position = positionOf(suggestion.id);
     return position ? { placeId: suggestion.id, position } : null;
   },

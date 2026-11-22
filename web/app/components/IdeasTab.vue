@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Idea, Place, TripView } from "~/types/api";
 import { placeError } from "~/utils/geo/input";
+import { referencePlaceId } from "~/utils/geo/nearby";
 
 /** 候補タブ: 行きたい場所の候補・投票・旅程に入れる */
 const props = defineProps<{ view: TripView }>();
@@ -25,8 +26,21 @@ const name = ref("");
 const note = ref("");
 const place = ref<Place | null>(null);
 const placeText = ref("");
+const placeInput = ref<{ settled(): Promise<void> } | null>(null);
+const proposing = ref(false);
 const errors = ref<string[]>([]);
 async function propose() {
+  if (proposing.value) return;
+  proposing.value = true;
+  try {
+    await placeInput.value?.settled();
+    await postIdea();
+  } finally {
+    proposing.value = false;
+  }
+}
+
+async function postIdea() {
   const found: string[] = [];
   if (!name.value.trim()) found.push("候補の名前を入力してください");
   if (name.value.trim().length > 100) found.push("候補の名前は 100 文字までです");
@@ -162,12 +176,18 @@ async function adopt() {
         <label for="idea-name">候補の名前 <span class="hint">100 文字まで</span></label>
         <input id="idea-name" v-model="name" type="text" maxlength="100" autocomplete="off" />
         <label for="idea-place"
-          >場所 <span class="hint">省略できます。地名を入れて候補から選ぶと、旅程に入れたとき地図に出ます</span></label
+          >場所 <span class="hint">省略できます。地名・駅・バス停の名前を入れて候補から選ぶと、旅程に入れたとき地図に出ます</span></label
         >
-        <PlaceInput v-model="place" v-model:text="placeText" input-id="idea-place" />
+        <PlaceInput
+          ref="placeInput"
+          v-model="place"
+          v-model:text="placeText"
+          input-id="idea-place"
+          :near-place-id="referencePlaceId(view.items, 1)"
+        />
         <label for="idea-note">ひとこと <span class="hint">省略できます。100 文字まで</span></label>
         <input id="idea-note" v-model="note" type="text" maxlength="100" />
-        <div class="actions"><button type="submit" class="primary">候補に出す</button></div>
+        <div class="actions"><button type="submit" class="primary" :disabled="proposing">候補に出す</button></div>
       </form>
     </section>
 

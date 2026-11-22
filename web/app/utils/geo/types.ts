@@ -15,6 +15,8 @@ export interface Suggestion {
   main: string;
   /** 補足(例: 京都府京都市東山区) */
   sub?: string;
+  /** 乗り物の種類(駅・バス停など) */
+  kind?: string;
 }
 
 export interface LatLng {
@@ -29,7 +31,8 @@ export interface ResolvedPlace {
 }
 
 export interface PlaceSearch {
-  suggest(text: string): Promise<Suggestion[]>;
+  /** near があれば、その近くを優先する */
+  suggest(text: string, near?: LatLng): Promise<Suggestion[]>;
   /** 候補を確定する。取れなければ null */
   resolve(suggestion: Suggestion): Promise<ResolvedPlace | null>;
   /** 保存した ID から、今の位置を取る */

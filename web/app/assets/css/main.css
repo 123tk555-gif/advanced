@@ -844,7 +844,7 @@ dialog::backdrop {
   margin: 4px 0 0;
   border: 1px solid var(--border);
   border-radius: 8px;
-  max-height: 220px;
+  max-height: min(440px, 50vh);
   overflow-y: auto;
 }
 .suggestions:empty {
@@ -1001,5 +1001,26 @@ p.gmaps-credit {
 }
 /* 候補の名前と住所の間を空ける */
 .suggestions li .muted {
+  margin-left: 8px;
+}
+
+/* 候補の乗り物の種類(色だけに頼らず文字で出す) */
+.stop-kind {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+/* 選んだ場所の名前(画面にだけ出す) */
+.chosen-place {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.chosen-place .gmaps-credit {
   margin-left: 8px;
 }

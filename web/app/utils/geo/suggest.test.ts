@@ -24,7 +24,7 @@ describe("createSuggester", () => {
     expect(search.suggest).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(search.suggest).toHaveBeenCalledTimes(1);
-    expect(search.suggest).toHaveBeenCalledWith("京都駅");
+    expect(search.suggest).toHaveBeenCalledWith("京都駅", undefined);
     expect(onResult).toHaveBeenLastCalledWith([s("京都駅")]);
   });
 
@@ -60,6 +60,21 @@ describe("createSuggester", () => {
     suggester.input("京都");
     await vi.advanceTimersByTimeAsync(300);
     expect(onResult).toHaveBeenLastCalledWith([]);
+  });
+
+  it("問い合わせる時点の、近くを優先する位置を渡す", async () => {
+    const search: PlaceSearch = {
+      suggest: vi.fn(async () => []),
+      resolve: vi.fn(),
+      locate: vi.fn(),
+    };
+    let near: { lat: number; lng: number } | undefined;
+    const suggester = createSuggester(search, () => {}, { near: () => near });
+    suggester.input("四条");
+    // 入力の時点では未取得でも、待っている間に届けば使う
+    near = { lat: 34.98, lng: 135.75 };
+    await vi.advanceTimersByTimeAsync(300);
+    expect(search.suggest).toHaveBeenCalledWith("四条", near);
   });
 
   it("cancel したら、待っている問い合わせも届く答えも捨てる", async () => {

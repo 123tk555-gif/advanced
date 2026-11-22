@@ -16,8 +16,15 @@ describe("仮の場所検索(API キーがないとき)", () => {
     expect(await fakePlaces.locate("unknown")).toBeNull();
   });
 
-  it("候補は 8 件まで", async () => {
-    expect((await fakePlaces.suggest("寺")).length).toBeLessThanOrEqual(8);
+  it("駅・バス停には種類が付く", async () => {
+    expect(await fakePlaces.suggest("清水")).toEqual([
+      { id: "fake:清水寺", main: "清水寺" },
+      { id: "fake:清水道", main: "清水道", kind: "バス停" },
+    ]);
+  });
+
+  it("候補は 10 件まで", async () => {
+    expect((await fakePlaces.suggest("京")).length).toBeLessThanOrEqual(10);
   });
 });
 

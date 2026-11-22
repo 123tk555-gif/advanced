@@ -3,6 +3,7 @@ import type { Editor } from "@tritri/shared";
 import { ApiError } from "~/composables/useApi";
 import type { Item, Member, Place } from "~/types/api";
 import { placeError } from "~/utils/geo/input";
+import { referencePlaceId } from "~/utils/geo/nearby";
 
 /**
  * 予定の追加・編集。
@@ -38,6 +39,7 @@ interface Draft {
 const state = ref<"edit" | "conflict">("edit");
 const draft = ref<Draft>({ day: 1, time: "", title: "", place: null, memo: "" });
 const placeText = ref("");
+const placeInput = ref<{ settled(): Promise<void> } | null>(null);
 const base = ref<{ version: number; day: number } | null>(null);
 const current = ref<Item | null>(null);
 const errors = ref<string[]>([]);
@@ -92,10 +94,13 @@ function body(version: number, fromDay: number) {
 }
 
 async function save(version?: number, fromDay?: number) {
-  errors.value = validate();
-  if (errors.value.length) return;
+  if (busy.value) return;
   busy.value = true;
   try {
+    await placeInput.value?.settled();
+    if (!props.open) return; // 待っている間に「やめる」で閉じた
+    errors.value = validate();
+    if (errors.value.length) return;
     if (!props.item) {
       const { day, title, time, place, memo } = draft.value;
       const res = await api.post<{ item: Item }>(`/trips/${props.tripId}/items`, {
@@ -186,9 +191,15 @@ function reedit() {
         <label for="it-title">タイトル <span class="hint">100 文字まで</span></label>
         <input id="it-title" v-model="draft.title" type="text" maxlength="100" autofocus />
         <label for="it-place"
-          >場所 <span class="hint">地名を入れると候補が出ます。候補から選んでください</span></label
+          >場所 <span class="hint">地名・駅・バス停の名前を入れると候補が出ます。候補から選んでください</span></label
         >
-        <PlaceInput v-model="draft.place" v-model:text="placeText" input-id="it-place" />
+        <PlaceInput
+          ref="placeInput"
+          v-model="draft.place"
+          v-model:text="placeText"
+          input-id="it-place"
+          :near-place-id="referencePlaceId(items, draft.day)"
+        />
         <label for="it-memo">メモ <span class="hint">1000 文字まで</span></label>
         <textarea id="it-memo" v-model="draft.memo" maxlength="1000" />
         <p v-if="item" class="small muted">

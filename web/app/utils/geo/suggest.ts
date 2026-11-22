@@ -1,4 +1,4 @@
-import type { PlaceSearch, Suggestion } from "./types";
+import type { LatLng, PlaceSearch, Suggestion } from "./types";
 
 /**
  * 場所の入力欄の候補を問い合わせる仕組み。
@@ -9,7 +9,11 @@ import type { PlaceSearch, Suggestion } from "./types";
 export function createSuggester(
   search: PlaceSearch,
   onResult: (suggestions: Suggestion[]) => void,
-  { delayMs = 300, minLength = 2 } = {},
+  {
+    delayMs = 300,
+    minLength = 2,
+    near = () => undefined,
+  }: { delayMs?: number; minLength?: number; near?: () => LatLng | undefined } = {},
 ) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let latest = 0;
@@ -30,7 +34,7 @@ export function createSuggester(
     timer = setTimeout(async () => {
       let found: Suggestion[];
       try {
-        found = await search.suggest(text);
+        found = await search.suggest(text, near());
       } catch {
         found = [];
       }

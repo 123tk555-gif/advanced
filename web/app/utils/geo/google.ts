@@ -1,7 +1,11 @@
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import type { Mode } from "../map";
 import { createAuthFailureWatcher } from "./auth";
-import type { Leg, PlaceSearch, RouteService } from "./types";
+import { mergeSuggestions, TRANSIT_TYPES, transitKind } from "./transit";
+import type { Leg, PlaceSearch, RouteService, Suggestion } from "./types";
+
+/** 候補で「近く」として優先する範囲。遠くの場所も除きはしない(Google の上限が 50km) */
+const NEAR_RADIUS_M = 50_000;
 
 /**
  * Google マップの API を使う版(ブラウザの中だけで動く)。
@@ -10,6 +14,7 @@ import type { Leg, PlaceSearch, RouteService } from "./types";
  *
  * 料金の枠を節約するため、次のようにしている。
  * - 場所の候補は、セッショントークンで「入力 → 1 件選ぶ」を 1 回分の利用にまとめる
+ * - 候補はふつうの検索と駅・バス停などの検索の 2 回(最大 10 件)。高い Text Search は使わない
  * - 場所は座標(location)だけを取る。座標はメモリに持つだけで保存しない(Google の規約)
  * - 経路は、所要時間・線・注意だけを取る
  */
@@ -39,28 +44,45 @@ export function createGooglePlaces(): PlaceSearch {
   const predictions = new Map<string, google.maps.places.PlacePrediction>();
 
   return {
-    async suggest(text) {
+    async suggest(text, near) {
       const { AutocompleteSessionToken, AutocompleteSuggestion } = await importLibrary("places");
       token ??= new AutocompleteSessionToken();
-      const { suggestions } = await AutocompleteSuggestion.fetchAutocompleteSuggestions({
+      const request: google.maps.places.AutocompleteRequest = {
         input: text,
         sessionToken: token,
         language: "ja",
         region: "jp",
+        ...(near ? { locationBias: { center: near, radius: NEAR_RADIUS_M } } : {}),
+      };
+      // 1 回に 5 件までで増やせないので、駅・バス停などに絞った検索を足す
+      const results = await Promise.allSettled([
+        AutocompleteSuggestion.fetchAutocompleteSuggestions(request),
+        AutocompleteSuggestion.fetchAutocompleteSuggestions({
+          ...request,
+          includedPrimaryTypes: TRANSIT_TYPES,
+        }),
+      ]);
+      if (results.every((r) => r.status === "rejected")) {
+        throw (results[0] as PromiseRejectedResult).reason;
+      }
+      const [general = [], transit = []] = results.map((result): Suggestion[] => {
+        if (result.status === "rejected") return [];
+        return result.value.suggestions.flatMap(({ placePrediction: p }) => {
+          if (!p) return [];
+          predictions.set(p.placeId, p);
+          const main = p.mainText?.text ?? p.text.text;
+          const kind = transitKind(main, p.types);
+          return [
+            {
+              id: p.placeId,
+              main,
+              ...(p.secondaryText?.text ? { sub: p.secondaryText.text } : {}),
+              ...(kind ? { kind } : {}),
+            },
+          ];
+        });
       });
-      predictions.clear();
-      return suggestions.flatMap((s) => {
-        const p = s.placePrediction;
-        if (!p) return [];
-        predictions.set(p.placeId, p);
-        return [
-          {
-            id: p.placeId,
-            main: p.mainText?.text ?? p.text.text,
-            ...(p.secondaryText?.text ? { sub: p.secondaryText.text } : {}),
-          },
-        ];
-      });
+      return mergeSuggestions(general, transit);
     },
 
     async resolve(suggestion) {
