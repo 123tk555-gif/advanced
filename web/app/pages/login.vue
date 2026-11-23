@@ -31,7 +31,9 @@ async function submit() {
   try {
     await api.put("/me", { displayName: name });
     const returnTo = typeof route.query.returnTo === "string" ? route.query.returnTo : "/trips";
-    await navigateTo(returnTo.startsWith("/") ? returnTo : "/trips");
+    // 「//よそのサイト」「/\よそのサイト」はブラウザが別のサイトとして扱うので、受け付けない
+    const inside = /^\/(?![/\\])/.test(returnTo);
+    await navigateTo(inside ? returnTo : "/trips");
     toast(`${name} さんとしてログインしました`);
   } catch (error) {
     auth.logout();

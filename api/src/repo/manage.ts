@@ -8,51 +8,68 @@ import {
 import { type TripInput, tripDays } from "@tritri/shared";
 import type { Deps } from "../context.js";
 import { deleteAll, queryKeys } from "../db/batch.js";
-import { failedConditionIndex, retryOnConflict } from "../db/errors.js";
+import { BusyError, failedConditionIndex, retryOnConflict } from "../db/errors.js";
 import { GSI1, keys } from "../db/table.js";
 import { getTripMeta, type Member, type Trip, toTrip } from "./trips.js";
 
-/** 旅の情報の変更(オーナー)。予定がある日より短くはできない */
+/**
+ * 旅の情報の変更(オーナー)。予定がある日より短くはできない。
+ * 予定の追加・移動と同時に行われても日程の外に予定が残らないよう、META の planRev
+ * (予定の配置が変わるたびに増える)が読んだときから変わっていないことを条件に書く。
+ */
 export async function updateTrip(
   deps: Deps,
   tripId: string,
   input: TripInput,
 ): Promise<{ trip: Trip } | { error: "items_out_of_range" | "not_found" }> {
-  const res = await deps.db.send(
-    new QueryCommand({
-      TableName: deps.tableName,
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
-      ExpressionAttributeValues: { ":pk": keys.tripPk(tripId), ":prefix": "ITEM#" },
-      ProjectionExpression: "#day",
-      ExpressionAttributeNames: { "#day": "day" },
-      ConsistentRead: true,
-    }),
-  );
-  const lastDay = Math.max(0, ...(res.Items ?? []).map((i) => i.day as number));
-  if (lastDay > tripDays(input.startDate, input.endDate)) return { error: "items_out_of_range" };
-
-  try {
-    const updated = await deps.db.send(
-      new UpdateCommand({
+  const dayCount = tripDays(input.startDate, input.endDate);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const meta = await getTripMeta(deps, tripId);
+    if (!meta) return { error: "not_found" };
+    const res = await deps.db.send(
+      new QueryCommand({
         TableName: deps.tableName,
-        Key: keys.tripMeta(tripId),
-        UpdateExpression:
-          "SET title = :title, startDate = :start, endDate = :end, destination = :dest",
-        ConditionExpression: "attribute_exists(PK)",
-        ExpressionAttributeValues: {
-          ":title": input.title,
-          ":start": input.startDate,
-          ":end": input.endDate,
-          ":dest": input.destination,
-        },
-        ReturnValues: "ALL_NEW",
+        KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
+        ExpressionAttributeValues: { ":pk": keys.tripPk(tripId), ":prefix": "ITEM#" },
+        ProjectionExpression: "#day",
+        ExpressionAttributeNames: { "#day": "day" },
+        ConsistentRead: true,
       }),
     );
-    return { trip: toTrip(updated.Attributes ?? {}) };
-  } catch (error) {
-    if (error instanceof ConditionalCheckFailedException) return { error: "not_found" };
-    throw error;
+    const lastDay = Math.max(0, ...(res.Items ?? []).map((i) => i.day as number));
+    if (lastDay > dayCount) return { error: "items_out_of_range" };
+
+    const rev = meta.planRev;
+    try {
+      const updated = await deps.db.send(
+        new UpdateCommand({
+          TableName: deps.tableName,
+          Key: keys.tripMeta(tripId),
+          UpdateExpression:
+            "SET title = :title, startDate = :start, endDate = :end, destination = :dest, dayCount = :days",
+          ConditionExpression:
+            rev === undefined
+              ? "attribute_exists(PK) AND attribute_not_exists(planRev)"
+              : "attribute_exists(PK) AND planRev = :rev",
+          ExpressionAttributeValues: {
+            ":title": input.title,
+            ":start": input.startDate,
+            ":end": input.endDate,
+            ":dest": input.destination,
+            ":days": dayCount,
+            ...(rev === undefined ? {} : { ":rev": rev }),
+          },
+          ReturnValues: "ALL_NEW",
+        }),
+      );
+      return { trip: toTrip(updated.Attributes ?? {}) };
+    } catch (error) {
+      if (!(error instanceof ConditionalCheckFailedException)) throw error;
+      // 読んでから予定が動いた(か旅が消えた)。読み直してやり直す
+      await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+    }
   }
+  throw new BusyError();
 }
 
 /**
@@ -116,7 +133,9 @@ export async function transferOwner(
                 TableName: deps.tableName,
                 Key: keys.member(tripId, toUserId),
                 UpdateExpression: "SET #role = :owner",
-                ConditionExpression: "attribute_exists(PK) AND #role = :member",
+                // 退会した人には引き継げない
+                ConditionExpression:
+                  "attribute_exists(PK) AND #role = :member AND attribute_not_exists(withdrawn)",
                 ExpressionAttributeNames: role,
                 ExpressionAttributeValues: { ":owner": "owner", ":member": "member" },
               },
@@ -155,7 +174,8 @@ export async function transferOwner(
 
 /**
  * 旅の削除(オーナー)。META を先に消して、すぐに誰も開けない状態にする。
- * 残りの項目・招待リンク・公開リンクは、その後にまとめて消す。
+ * 招待リンク・公開リンクもすぐ消す。残りの項目(最大で数万件)は deps.later で後から片付ける
+ * (API Gateway の 30 秒に収めるため。消し残しても META が無いので、誰にも見えない)。
  */
 export async function deleteTrip(
   deps: Deps,
@@ -181,7 +201,9 @@ export async function deleteTrip(
   if (typeof meta.inviteToken === "string") links.push(keys.invite(meta.inviteToken));
   if (typeof meta.publicToken === "string") links.push(keys.publicLink(meta.publicToken));
   await deleteAll(deps, links);
-  await deleteAll(deps, await queryKeys(deps, keys.tripPk(tripId), ""));
+  await deps.later(async () => {
+    await deleteAll(deps, await queryKeys(deps, keys.tripPk(tripId), ""));
+  });
   return "deleted";
 }
 

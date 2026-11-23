@@ -17,6 +17,7 @@ const app = createApp({
   now: () => new Date(),
   // API Gateway WebSocket の入口と送信部品は、AWS に公開する段階で作る。それまでは通知しない
   realtime: noRealtime,
+  later: (task) => task(),
 });
 
 export const handler = handle(app);

@@ -2,9 +2,10 @@ import { GetCommand, QueryCommand, TransactWriteCommand } from "@aws-sdk/lib-dyn
 import { type IdeaAdopt, type IdeaCreate, MAX_IDEAS_PER_TRIP, type Place } from "@tritri/shared";
 import { ulid } from "ulid";
 import type { Deps } from "../context.js";
+import { deleteAll } from "../db/batch.js";
 import { failedConditionIndex, retryOnConflict } from "../db/errors.js";
 import { keys } from "../db/table.js";
-import { checkDay, type Item, itemCreateWrites, newItem } from "./items.js";
+import { checkDay, type Item, itemCreateWrites, metaFailure, newItem } from "./items.js";
 import type { Member } from "./trips.js";
 
 /** 保存している候補 */
@@ -140,47 +141,49 @@ export async function deleteIdea(
   if (!idea) return "not_found";
   if (idea.createdBy !== me.userId && me.role !== "owner") return "forbidden";
 
+  try {
+    await retryOnConflict(() =>
+      deps.db.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Delete: {
+                TableName: deps.tableName,
+                Key: keys.idea(tripId, ideaId),
+                ConditionExpression: "attribute_exists(PK)",
+              },
+            },
+            {
+              Update: {
+                TableName: deps.tableName,
+                Key: keys.tripMeta(tripId),
+                UpdateExpression: "SET ideaCount = ideaCount - :one",
+                // 旅が消えていたら書かない(消えた旅の META を作り直さないように)
+                ConditionExpression: "attribute_exists(PK)",
+                ExpressionAttributeValues: { ":one": 1 },
+              },
+            },
+          ],
+        }),
+      ),
+    );
+  } catch (error) {
+    if (failedConditionIndex(error) === 0) return "not_found";
+    throw error;
+  }
+  // 投票は後から消す。抜けた人の票も残るので 100 件を超えることがあり、1 つのトランザクションには収まらない。
+  // 消し残しても、候補が無いので数えられない(buildIdeas)
   const votes = await deps.db.send(
     new QueryCommand({
       TableName: deps.tableName,
       KeyConditionExpression: "PK = :pk AND begins_with(SK, :prefix)",
       ExpressionAttributeValues: { ":pk": keys.tripPk(tripId), ":prefix": `VOTE#${ideaId}#` },
       ProjectionExpression: "PK, SK",
+      ConsistentRead: true,
     }),
   );
-  try {
-    // 投票はメンバーの数(最大 50)までなので、1 つのトランザクション(最大 100 件)に収まる
-    await deps.db.send(
-      new TransactWriteCommand({
-        TransactItems: [
-          {
-            Delete: {
-              TableName: deps.tableName,
-              Key: keys.idea(tripId, ideaId),
-              ConditionExpression: "attribute_exists(PK)",
-            },
-          },
-          {
-            Update: {
-              TableName: deps.tableName,
-              Key: keys.tripMeta(tripId),
-              UpdateExpression: "SET ideaCount = ideaCount - :one",
-              // 旅が消えていたら書かない(消えた旅の META を作り直さないように)
-              ConditionExpression: "attribute_exists(PK)",
-              ExpressionAttributeValues: { ":one": 1 },
-            },
-          },
-          ...(votes.Items ?? []).map((v) => ({
-            Delete: { TableName: deps.tableName, Key: { PK: v.PK, SK: v.SK } },
-          })),
-        ],
-      }),
-    );
-    return "deleted";
-  } catch (error) {
-    if (failedConditionIndex(error) === 0) return "not_found";
-    throw error;
-  }
+  await deleteAll(deps, votes.Items ?? []);
+  return "deleted";
 }
 
 /** 投票(2 回押しても 1 票)。無い候補なら not_found */
@@ -294,7 +297,7 @@ export async function adoptIdea(
     return { item };
   } catch (error) {
     const index = failedConditionIndex(error);
-    if (index === 1) return { error: "too_many" };
+    if (index === 1) return { error: await metaFailure(deps, tripId, input.day) };
     if (index === 2) {
       return (await getIdea(deps, tripId, ideaId))
         ? { error: "already_adopted" }

@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
-import { addItem, createTrip, inviteUrl, joinAndApprove, openAs, uniqueId } from "./helpers.js";
+import {
+  addItem,
+  createTrip,
+  inviteUrl,
+  joinAndApprove,
+  openAs,
+  showList,
+  showMap,
+  uniqueId,
+} from "./helpers.js";
 
 test("旅を作り、場所つきの予定を足すと、一覧と地図に出る", async ({ browser }) => {
   const taro = await openAs(browser, "たろう");
@@ -9,6 +18,7 @@ test("旅を作り、場所つきの予定を足すと、一覧と地図に出�
   await addItem(taro, 1, "伏見稲荷大社", "伏見稲荷");
 
   // 地図に 2 つのピンと、区間の移動時間が出る
+  await showMap(taro);
   await expect(taro.getByRole("img", { name: /1日目の地図.*京都駅.*伏見稲荷/ })).toBeVisible();
   await expect(taro.locator(".map-legs li")).toHaveCount(1);
 
@@ -191,6 +201,7 @@ test("場所は入力した文字と ID だけを保存し、表示名は自分�
   });
   await expect(taro.locator(".item-place")).toHaveText("場所: お稲荷さん");
   await taro.reload();
+  await showMap(taro);
   await expect(taro.getByRole("img", { name: /1日目の地図.*お稲荷さん/ })).toBeVisible();
 });
 
@@ -199,6 +210,7 @@ test("公共交通は目安の時間を出さず、Google マップで調べる�
   await createTrip(taro, "公共交通の旅");
   await addItem(taro, 1, "集合", "京都駅");
   await addItem(taro, 1, "お参り", "伏見稲荷");
+  await showMap(taro);
   await taro.getByRole("button", { name: "公共交通", exact: true }).click();
 
   const leg = taro.locator(".map-legs li");
@@ -207,6 +219,7 @@ test("公共交通は目安の時間を出さず、Google マップで調べる�
   const link = leg.getByRole("link", { name: /Google マップで調べる/ });
   await expect(link).toHaveAttribute("href", /travelmode=transit/);
   await expect(link).toHaveAttribute("href", /origin_place_id=/);
+  await showList(taro);
   await expect(
     taro.locator(".leg-in").getByRole("link", { name: /Google マップで調べる/ }),
   ).toBeVisible();

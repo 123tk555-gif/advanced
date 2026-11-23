@@ -51,11 +51,15 @@ const suggester = createSuggester(
 );
 onBeforeUnmount(() => suggester.cancel());
 
-function onInput() {
+function onInput(e: Event) {
   failure.value = "";
+  // 入力欄の今の値を使う。text は親の値なので、入れた直後に読むと古い値が返ることがある
+  // (Firefox で貼り付け・変換の確定をしたとき、v-model がまだ値を更新していない)
+  const value = (e.target as HTMLInputElement).value;
+  text.value = value;
   // 基準の座標が未取得なら、入力が止まるのを待つ間に取っておく
   nearPosition();
-  suggester.input(text.value);
+  suggester.input(value);
 }
 
 async function focusField() {

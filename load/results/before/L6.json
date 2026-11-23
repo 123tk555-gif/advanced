@@ -1,0 +1,205 @@
+{
+  "id": "L6",
+  "quick": false,
+  "began": "2026-11-23T02:30:32.364Z",
+  "ended": "2026-11-23T02:31:34.247Z",
+  "result": {
+    "cases": [
+      {
+        "name": "同じ予定を同時に更新",
+        "statuses": {
+          "200": 1,
+          "409": 49
+        },
+        "checks": {
+          "5xx が 0": true,
+          "成功は 1 件": true,
+          "ほかは 409": true,
+          "成功した内容が残る": true
+        },
+        "ok": true
+      },
+      {
+        "name": "予定の上限 300 件への駆け込み",
+        "statuses": {
+          "201": 25,
+          "409": 25
+        },
+        "checks": {
+          "5xx が 0": true,
+          "成功は 25 件": true,
+          "上限ちょうど": true
+        },
+        "ok": true
+      },
+      {
+        "name": "候補の上限 100 件への駆け込み",
+        "statuses": {
+          "201": 25,
+          "409": 25
+        },
+        "checks": {
+          "5xx が 0": true,
+          "成功は 25 件": true,
+          "上限ちょうど": true
+        },
+        "ok": true
+      },
+      {
+        "name": "支出の上限 500 件への駆け込み",
+        "statuses": {
+          "201": 25,
+          "409": 25
+        },
+        "checks": {
+          "5xx が 0": true,
+          "成功は 25 件": true,
+          "上限ちょうど": true
+        },
+        "ok": true
+      },
+      {
+        "name": "コメントの上限 200 件への駆け込み",
+        "statuses": {
+          "201": 25,
+          "409": 25
+        },
+        "checks": {
+          "5xx が 0": true,
+          "成功は 25 件": true,
+          "上限ちょうど": true
+        },
+        "ok": true
+      },
+      {
+        "name": "50 人の上限への同時承認",
+        "statuses": {
+          "200": 10,
+          "409": 10
+        },
+        "checks": {
+          "5xx が 0": true,
+          "成功は 10 人": true,
+          "50 人ちょうど": true
+        },
+        "ok": true
+      },
+      {
+        "name": "同時投票(全員が 2 回ずつ)",
+        "statuses": {
+          "204": 100
+        },
+        "checks": {
+          "5xx が 0": true,
+          "1 人 1 票": true
+        },
+        "ok": true
+      },
+      {
+        "name": "同時採用",
+        "statuses": {
+          "201": 1,
+          "409": 49
+        },
+        "checks": {
+          "5xx が 0": true,
+          "成功は 1 件": true,
+          "予定は 1 件": true
+        },
+        "ok": true
+      },
+      {
+        "name": "候補の同時削除",
+        "statuses": {
+          "204": 50
+        },
+        "checks": {
+          "5xx が 0": true,
+          "すべて消える": true
+        },
+        "ok": true
+      },
+      {
+        "name": "同時の支出と精算",
+        "statuses": {
+          "201": 50
+        },
+        "checks": {
+          "5xx が 0": true,
+          "全件が残る": true,
+          "精算のずれ 0 円": true
+        },
+        "ok": true
+      },
+      {
+        "name": "招待リンクの同時発行",
+        "statuses": {
+          "200": 2,
+          "500": 18
+        },
+        "checks": {
+          "5xx が 0": false,
+          "使えるリンクは 1 本": true
+        },
+        "ok": false
+      },
+      {
+        "name": "公開リンクの同時発行",
+        "statuses": {
+          "200": 1,
+          "500": 19
+        },
+        "checks": {
+          "5xx が 0": false,
+          "使えるリンクは 1 本": true
+        },
+        "ok": false
+      }
+    ],
+    "pass": false
+  },
+  "server": {
+    "samples": 11,
+    "maxRssMb": 294,
+    "maxCpuPct": 86,
+    "maxLoopP99Ms": 140,
+    "trend": [
+      {
+        "rssMb": 138,
+        "heapMb": 41
+      },
+      {
+        "rssMb": 202,
+        "heapMb": 56
+      },
+      {
+        "rssMb": 247,
+        "heapMb": 81
+      },
+      {
+        "rssMb": 261,
+        "heapMb": 92
+      },
+      {
+        "rssMb": 284,
+        "heapMb": 92
+      },
+      {
+        "rssMb": 281,
+        "heapMb": 66
+      }
+    ],
+    "errorLines": [
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]",
+      "TransactionCanceledException: Transaction cancelled, please refer cancellation reasons for specific reasons [None, None, ConditionalCheckFailed]"
+    ]
+  }
+}

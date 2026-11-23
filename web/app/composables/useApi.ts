@@ -33,7 +33,12 @@ export function useApi() {
       throw new ApiError(0, "NETWORK", null);
     }
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    let data: unknown = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      // 途中の仕組み(中継・ゲートウェイ)が JSON でない応答を返すことがある
+    }
     if (!res.ok) {
       if (res.status === 401 && user.value) {
         // ログインが切れた: ログイン画面へ
@@ -67,6 +72,9 @@ export function errorMessage(error: unknown): string {
     TOO_MANY_IDEAS: "候補は 1 つの旅に 100 件までです",
     TOO_MANY_EXPENSES: "支出は 1 つの旅に 500 件までです",
     TOO_MANY_COMMENTS: "コメントは 1 つの予定に 200 件までです",
+    TOO_MANY_TRIP_COMMENTS: "コメントは 1 つの旅に 2,000 件までです",
+    BUSY: "混み合っています。少し待ってから、もう一度試してください",
+    INTERNAL: "うまくいきませんでした。もう一度試してください",
     TOO_MANY_JOIN_REQUESTS: "この旅は申請が多いため、今は申請できません",
     DAY_OUT_OF_RANGE: "旅の日数の範囲で日にちを選んでください",
     ITEMS_OUT_OF_RANGE: "予定がある日より短くはできません。先に予定を動かしてください",

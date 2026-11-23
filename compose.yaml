@@ -5,4 +5,5 @@ services:
     image: amazon/dynamodb-local:latest
     command: -jar DynamoDBLocal.jar -inMemory -sharedDb
     ports:
-      - "8000:8000"
+      # このパソコンの中からだけつながる(認証の無い DB を、同じネットワークの他の機器に見せない)
+      - "127.0.0.1:8000:8000"

@@ -16,6 +16,7 @@ import { createMiddleware } from "hono/factory";
 import { secureHeaders } from "hono/secure-headers";
 import type { ZodType } from "zod";
 import type { AppEnv, Deps } from "./context.js";
+import { isConflict } from "./db/errors.js";
 import { withdraw } from "./repo/account.js";
 import { createComment, deleteComment, deleteCommentsOfItem } from "./repo/comments.js";
 import { createExpense, deleteExpense } from "./repo/expenses.js";
@@ -68,6 +69,21 @@ const notFound = { error: "NOT_FOUND" } as const;
 export function createApp(deps: Deps) {
   const app = new Hono<AppEnv>();
 
+  // 想定外の失敗も JSON で返し、内部の情報(例外の中身)は応答に出さない。
+  // 同時の書き込みが続いて通らなかったときは、混み合っていると返す(画面は少し待ってやり直せる)
+  app.onError((error, c) => {
+    if (isConflict(error)) return c.json({ error: "BUSY" }, 503);
+    console.error("API の処理に失敗しました", error);
+    return c.json({ error: "INTERNAL" }, 500);
+  });
+
+  // URL の ID・トークンは長くても数十文字。極端に長いものは DB に問い合わせずに「見つからない」
+  // (DynamoDB のキーの長さの上限を超えると、DB が失敗して 500 になるため)
+  app.use("*", async (c, next) => {
+    if (c.req.path.split("/").some((part) => part.length > 200)) return c.json(notFound, 404);
+    await next();
+  });
+
   app.use("*", secureHeaders());
   app.use(
     "*",
@@ -99,7 +115,8 @@ export function createApp(deps: Deps) {
   const memberOnly = createMiddleware<AppEnv>(async (c, next) => {
     const tripId = c.req.param("tripId");
     const member = tripId ? await getMember(deps, tripId, c.get("userId")) : undefined;
-    if (!member) return c.json(notFound, 404);
+    // 退会した人のメンバー情報は、支出などの記録のために残してある。旅は開けない
+    if (!member || member.withdrawn) return c.json(notFound, 404);
     c.set("member", member);
     await next();
   });
@@ -209,7 +226,12 @@ export function createApp(deps: Deps) {
 
   app.post("/trips/:tripId/leave", async (c) => {
     if (c.get("member").role === "owner") return c.json({ error: "OWNER_MUST_TRANSFER" }, 409);
-    await removeMember(deps, c.req.param("tripId"), c.get("userId"));
+    const tripId = c.req.param("tripId");
+    if ((await removeMember(deps, tripId, c.get("userId"))) === "not_found") {
+      // 同時にオーナーを引き継がれていた
+      const now = await getMember(deps, tripId, c.get("userId"));
+      if (now?.role === "owner") return c.json({ error: "OWNER_MUST_TRANSFER" }, 409);
+    }
     return c.body(null, 204);
   });
 
@@ -233,7 +255,8 @@ export function createApp(deps: Deps) {
     const tripId = await findTripIdByInvite(deps, c.req.param("token"));
     if (!tripId) return c.json(notFound, 404);
     const userId = c.get("userId");
-    if (await getMember(deps, tripId, userId)) return c.json({ error: "ALREADY_MEMBER" }, 409);
+    const member = await getMember(deps, tripId, userId);
+    if (member && !member.withdrawn) return c.json({ error: "ALREADY_MEMBER" }, 409);
     const profile = await getProfile(deps, userId);
     if (!profile) return c.json({ error: "PROFILE_REQUIRED" }, 409);
 
@@ -336,8 +359,9 @@ export function createApp(deps: Deps) {
     const { tripId, itemId } = c.req.param();
     const result = await createComment(deps, tripId, itemId, c.get("member"), c.req.valid("json"));
     if ("comment" in result) return c.json(result, 201);
-    return result.error === "not_found"
-      ? c.json(notFound, 404)
+    if (result.error === "not_found") return c.json(notFound, 404);
+    return result.error === "too_many_in_trip"
+      ? c.json({ error: "TOO_MANY_TRIP_COMMENTS" }, 409)
       : c.json({ error: "TOO_MANY_COMMENTS" }, 409);
   });
 

@@ -52,6 +52,10 @@ const api = createApp({
   resolveUserId: (c) => c.req.header(DEV_USER_HEADER) || undefined,
   now,
   realtime,
+  // 待たずに応答する。失敗しても応答には影響させず、記録だけ残す
+  later: async (task) => {
+    task().catch((error) => console.error("後片付けに失敗しました", error));
+  },
 });
 
 const server = new Hono();

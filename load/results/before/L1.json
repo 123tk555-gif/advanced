@@ -1,0 +1,89 @@
+{
+  "id": "L1",
+  "quick": false,
+  "began": "2026-11-23T01:30:30.792Z",
+  "ended": "2026-11-23T01:31:39.135Z",
+  "result": {
+    "code": 0,
+    "metrics": {
+      "app_errors": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 2665,
+        "thresholds": {
+          "rate==0": true
+        }
+      },
+      "checks": {
+        "rate": 1,
+        "passes": 2665,
+        "fails": 0,
+        "thresholds": {
+          "rate==1": true
+        }
+      },
+      "app_write_ms": {
+        "p(99)": 48.07307497999995,
+        "max": 107.128371,
+        "count": 2275,
+        "avg": 18.94319494065936,
+        "min": 6.422036,
+        "med": 17.706299,
+        "p(90)": 26.465824400000006,
+        "p(95)": 30.623211699999988
+      },
+      "http_reqs": {
+        "rate": 44.2118265826493,
+        "count": 2665
+      },
+      "app_read_ms": {
+        "p(95)": 13.245814699999993,
+        "p(99)": 23.17652680000006,
+        "max": 56.5804,
+        "count": 390,
+        "avg": 8.984435882051283,
+        "min": 3.761773,
+        "med": 8.7015905,
+        "p(90)": 11.576626000000001
+      },
+      "data_received": {
+        "count": 1706885,
+        "rate": 28316.886910516077
+      }
+    },
+    "notes": ""
+  },
+  "server": {
+    "samples": 12,
+    "maxRssMb": 217,
+    "maxCpuPct": 36,
+    "maxLoopP99Ms": 35,
+    "trend": [
+      {
+        "rssMb": 123,
+        "heapMb": 43
+      },
+      {
+        "rssMb": 158,
+        "heapMb": 55
+      },
+      {
+        "rssMb": 214,
+        "heapMb": 72
+      },
+      {
+        "rssMb": 213,
+        "heapMb": 39
+      },
+      {
+        "rssMb": 214,
+        "heapMb": 61
+      },
+      {
+        "rssMb": 216,
+        "heapMb": 72
+      }
+    ],
+    "errorLines": []
+  }
+}

@@ -1,6 +1,6 @@
 import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import type { Deps } from "../context.js";
-import { retryOnConflict } from "../db/errors.js";
+import { retryWhenChanged } from "../db/errors.js";
 import { keys } from "../db/table.js";
 import { getTripMeta, loadTripPartition, newToken } from "./trips.js";
 
@@ -13,7 +13,7 @@ export async function replacePublicLink(
   tripId: string,
   next: "new" | null,
 ): Promise<{ token: string } | null> {
-  return retryOnConflict(async () => {
+  return retryWhenChanged(async () => {
     const meta = await getTripMeta(deps, tripId);
     if (!meta) throw new Error(`trip not found: ${tripId}`);
     const old = typeof meta.publicToken === "string" ? meta.publicToken : null;

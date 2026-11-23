@@ -15,7 +15,9 @@ export const TEST_USER_HEADER = "x-test-user-id";
  * テストファイルごとに専用のテーブルを作り、そのテーブルを使う API を返す。
  * テストファイル同士が同じデータを触らないようにするため。
  */
-export function useTestApi(options: { sender?: Sender } = {}) {
+export function useTestApi(
+  options: { sender?: Sender; later?: (task: () => Promise<void>) => Promise<void> } = {},
+) {
   const db = createDocClient({
     endpoint: process.env.DYNAMODB_ENDPOINT ?? "http://localhost:8000",
   });
@@ -49,6 +51,8 @@ export function useTestApi(options: { sender?: Sender } = {}) {
     resolveUserId: (c) => c.req.header(TEST_USER_HEADER),
     now,
     realtime,
+    // 既定では待ってから応答する(Lambda と同じ)。後で行う動きを試すときは差し替える
+    later: options.later ?? ((task) => task()),
   });
 
   beforeAll(async () => {
@@ -140,6 +144,8 @@ export function useTestApi(options: { sender?: Sender } = {}) {
 
   return {
     app,
+    db,
+    tableName,
     call,
     signUp,
     createTrip,

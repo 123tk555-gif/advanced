@@ -120,7 +120,8 @@ export async function deleteExpense(
               Update: {
                 TableName: deps.tableName,
                 Key: keys.tripMeta(tripId),
-                UpdateExpression: "SET expenseCount = expenseCount - :one",
+                // 一度も記録の無い旅では件数が無い(無い件数から引くと 500 になる)
+                UpdateExpression: "SET expenseCount = if_not_exists(expenseCount, :one) - :one",
                 // 旅が消えていたら書かない(消えた旅の META を作り直さないように)
                 ConditionExpression: "attribute_exists(PK)",
                 ExpressionAttributeValues: { ":one": 1 },
