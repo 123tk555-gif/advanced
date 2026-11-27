@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { createTrip, openAs } from "./helpers.js";
 
 test("駅・バス停が種類つきで候補に出て、選べる", async ({ browser }) => {
