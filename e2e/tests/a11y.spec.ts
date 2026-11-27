@@ -34,7 +34,11 @@ async function check(page: Page, screen: string) {
 }
 
 for (const colorScheme of ["light", "dark"] as const) {
-  test(`すべての画面に重大な指摘が無い(${colorScheme})`, async ({ browser }) => {
+  test(`すべての画面に重大な指摘が無い(${colorScheme})`, async ({ browser, browserName }) => {
+    // Playwright の Firefox では、旅程から別のタブへ移った後の画面で axe を動かすと、画面の処理が落ちる
+    // (Windows・Linux とも。保存した HTML では再現せず、普通の操作では落ちない)。
+    // 全画面の検査は Chromium・WebKit・スマートフォン幅で行い、Firefox はキーボード操作の検査だけにする
+    test.skip(browserName === "firefox", "Playwright の Firefox が axe の実行中に落ちるため");
     test.setTimeout(150_000);
     const page = await openAs(browser, "長い名前のたろうさん");
     await page.emulateMedia({ colorScheme, reducedMotion: "reduce" });
