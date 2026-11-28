@@ -24,6 +24,13 @@ export default defineNuxtConfig({
       googleMapsApiKey: "",
       // 地図のスタイルの ID(NUXT_PUBLIC_GOOGLE_MAPS_MAP_ID)。空なら Google の試用 ID を使う
       googleMapsMapId: "",
+      // ログインの仕組み。Cognito のユーザープール ID とアプリのクライアント ID があれば本番のログイン
+      // (NUXT_PUBLIC_COGNITO_USER_POOL_ID・NUXT_PUBLIC_COGNITO_CLIENT_ID。どちらも画面に埋め込まれて構わない値)
+      cognitoUserPoolId: "",
+      cognitoClientId: "",
+      // Cognito が無いときの仕組み(NUXT_PUBLIC_AUTH_MODE)。"fake" なら試験用のメールとパスワードのログイン、
+      // 空なら開発用(利用者 ID と表示名だけ)
+      authMode: "",
     },
   },
   typescript: {

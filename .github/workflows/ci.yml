@@ -58,6 +58,9 @@ jobs:
           browser=${{ matrix.project == 'mobile' && 'chromium' || matrix.project }}
           pnpm --filter @tritri/e2e exec playwright install --with-deps "$browser"
       - run: pnpm --filter @tritri/e2e exec playwright test --project=${{ matrix.project }}
+      # メールアドレスとパスワードのログイン(会員登録・確認コード・再設定・退会)。Cognito の代わりに試験用のログインで
+      - if: matrix.project == 'chromium'
+        run: pnpm --filter @tritri/e2e exec playwright test -c playwright.auth.config.ts --project=chromium
       - uses: actions/upload-artifact@v5
         if: failure()
         with:

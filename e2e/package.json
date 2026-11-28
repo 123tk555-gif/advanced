@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "test": "playwright test --project=chromium",
-    "test:all": "playwright test"
+    "test:all": "playwright test",
+    "test:auth": "playwright test -c playwright.auth.config.ts --project=chromium"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.14.0",
