@@ -35,6 +35,19 @@ export default defineNuxtConfig({
       authMode: "",
     },
   },
+  vite: {
+    optimizeDeps: {
+      // 開発用サーバーは、初めて見る部品をその場でまとめ直し、画面を読み込み直す。
+      // 操作の途中で読み込み直すと自動テストが途切れる(遅い CI の最初のテストで起きた)ので、起動のときに先にまとめる
+      include: [
+        "aws-amplify",
+        "aws-amplify/auth",
+        "fractional-indexing",
+        "@googlemaps/js-api-loader",
+        "@tritri/shared > zod",
+      ],
+    },
+  },
   typescript: {
     strict: true,
   },
