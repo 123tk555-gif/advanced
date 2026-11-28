@@ -72,6 +72,7 @@ aws sso login --profile <プロファイル>
 corepack pnpm --filter @tritri/infra exec cdk diff --profile <プロファイル>     # 作る・変わる資源を確かめる
 corepack pnpm --filter @tritri/infra exec cdk deploy --profile <プロファイル>
 node infra/deploy-web.mjs --profile <プロファイル>                               # 画面を作って上げる(--dry-run で試し)
+corepack pnpm --filter @tritri/infra smoke --profile <プロファイル>               # 公開の後の確かめ(読むだけ。deploy-web の最後にも流れる)
 ```
 
 - 初めてのアカウント・リージョンでは、先に `cdk bootstrap` が要る
@@ -79,6 +80,7 @@ node infra/deploy-web.mjs --profile <プロファイル>                        
 - Google マップのキーには、公開した URL(`https://xxxx.cloudfront.net/*`)をリファラーに足す([Googleマップの設定.md](docs/Googleマップの設定.md))
 - 画面を上げる前に `pnpm dev:web` を止める(本番用ビルドをするため)
 - `corepack pnpm --filter @tritri/infra test` で、作る資源の形を確かめる(AWS にはつながない)
+- 公開の後の確かめは、画面・ブラウザの下見(CORS)・ログインが要る道の 401・API と WebSocket の Lambda が動いているか、を読むだけで確かめる(データは作らず、メールも送らない)。`cdk deploy` の後にも流す
 
 ## 文書
 - [要件定義書](docs/要件定義書.md)・[データ設計](docs/データ設計.md)・[画面一覧](docs/画面一覧.md)

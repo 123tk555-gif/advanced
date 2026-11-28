@@ -128,3 +128,9 @@ write(
 );
 
 console.log(`\n${dryRun ? "(試し)" : "公開しました"}: ${outputs.SiteUrl}`);
+
+// 5. 公開の後の確かめ(読むだけ)。不合格なら、このスクリプトも失敗で終わる
+if (!dryRun) {
+  console.log("\n公開の後の確かめ:");
+  run("corepack", ["pnpm", "--filter", "@tritri/infra", "smoke", "--profile", profile]);
+}

@@ -6,7 +6,8 @@
     "cdk": "cdk",
     "synth": "cdk synth --quiet",
     "test": "vitest run",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "smoke": "tsx bin/smoke.ts"
   },
   "dependencies": {
     "aws-cdk-lib": "2.277.0",
