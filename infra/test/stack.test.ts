@@ -105,14 +105,22 @@ describe("HTTP API", () => {
       (r) => !String(r.Properties.RouteKey).startsWith("$"),
     );
     const byKey = Object.fromEntries(routes.map((r) => [r.Properties.RouteKey, r.Properties]));
-    expect(Object.keys(byKey).sort()).toEqual(["ANY /{proxy+}", "GET /public/{token}"]);
-    expect(byKey["ANY /{proxy+}"].AuthorizationType).toBe("JWT");
+    const methods = ["DELETE", "GET", "PATCH", "POST", "PUT"];
+    expect(Object.keys(byKey).sort()).toEqual(
+      [...methods.map((m) => `${m} /{proxy+}`), "GET /public/{token}"].sort(),
+    );
+    for (const m of methods) expect(byKey[`${m} /{proxy+}`].AuthorizationType).toBe("JWT");
     expect(byKey["GET /public/{token}"].AuthorizationType).toBe("NONE");
     t.hasResourceProperties("AWS::ApiGatewayV2::Authorizer", {
       AuthorizerType: "JWT",
       IdentitySource: ["$request.header.Authorization"],
       JwtConfiguration: Match.objectLike({ Audience: [Match.anyValue()] }),
     });
+  });
+
+  it("ブラウザの下見(OPTIONS)は JWT の確認に回さない(回すと 401 になり、画面が API を呼べない)", () => {
+    const keys = resourcesOf("AWS::ApiGatewayV2::Route").map((r) => String(r.Properties.RouteKey));
+    expect(keys.filter((k) => k.startsWith("ANY ") || k.startsWith("OPTIONS "))).toEqual([]);
   });
 
   it("CORS は CloudFront の画面からだけ", () => {

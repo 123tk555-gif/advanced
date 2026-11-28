@@ -258,9 +258,17 @@ export class TriTriStack extends Stack {
       `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
       { jwtAudience: [client.userPoolClientId] },
     );
+    // ANY にすると、ブラウザの下見(OPTIONS)まで JWT の確認に回って 401 になる。
+    // 使う種類だけを並べ、OPTIONS は上の corsPreflight で API Gateway に答えさせる
     httpApi.addRoutes({
       path: "/{proxy+}",
-      methods: [apigw.HttpMethod.ANY],
+      methods: [
+        apigw.HttpMethod.GET,
+        apigw.HttpMethod.POST,
+        apigw.HttpMethod.PUT,
+        apigw.HttpMethod.PATCH,
+        apigw.HttpMethod.DELETE,
+      ],
       integration: apiIntegration,
       authorizer: jwt,
     });
