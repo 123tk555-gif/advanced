@@ -77,7 +77,14 @@ const tabs = [
         >{{ fmtRange(view.trip)
         }}<template v-if="view.trip.destination"> ・ {{ view.trip.destination }}</template></span
       >
-      <NuxtLink :to="`/trips/${tripId}/settings`" class="small">旅の設定</NuxtLink>
+      <!-- 見つけやすいよう、ボタンの形にして、そこでできることも書く(役割で変わる) -->
+      <NuxtLink :to="`/trips/${tripId}/settings`" class="button trip-settings-link">
+        旅の設定<span class="trip-settings-hint">{{
+          view.myRole === "owner"
+            ? "(タイトル・日程の変更、公開しおり、旅の削除など)"
+            : "(旅の情報・公開しおりの確認、この旅から抜ける)"
+        }}</span>
+      </NuxtLink>
     </div>
     <PresenceBar :state="state" :people="people" />
     <p v-if="loadError" class="notice warn" role="status">{{ loadError }}</p>

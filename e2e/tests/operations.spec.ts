@@ -282,6 +282,28 @@ test.describe("メンバー・招待", () => {
 });
 
 test.describe("旅の設定", () => {
+  test("旅の画面から、旅の設定へのボタンが見つけやすい。できることは役割に合わせて書く", async ({
+    browser,
+  }) => {
+    const owner = await openAs(browser, "たろう");
+    const guest = await openAs(browser, "はなこ");
+    await createTrip(owner, "設定を探す旅");
+    const ownerLink = owner.getByRole("link", { name: /^旅の設定/ });
+    await expect(ownerLink).toHaveAccessibleName(/タイトル・日程の変更.*旅の削除/);
+    await expect(ownerLink).toHaveClass(/\bbutton\b/);
+    // 押しやすい大きさ(ほかのボタンと同じ 44px 以上)
+    expect((await ownerLink.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+    await openTab(owner, "メンバー");
+    await joinAndApprove(owner, guest, "はなこ");
+    await guest.reload();
+    const guestLink = guest.getByRole("link", { name: /^旅の設定/ });
+    await expect(guestLink).toBeVisible();
+    // オーナーでなければ削除はできないので、書かない
+    await expect(guestLink).not.toHaveAccessibleName(/削除/);
+    await expect(guestLink).toHaveAccessibleName(/抜ける/);
+  });
+
   test("旅の情報を変えると、一覧にも出る", async ({ browser }) => {
     const page = await openAs(browser, "たろう");
     await createTrip(page, "変更前の旅");
