@@ -14,10 +14,39 @@ export async function openAs(browser: Browser, name: string): Promise<Page> {
   const page = await context.newPage();
   await page.goto("/login");
   await page.getByLabel("利用者 ID").fill(uniqueId("u"));
-  await page.getByLabel("表示名").fill(name);
+  await fillJapanese(page.getByLabel("表示名"), name);
+  // ログインの API(PUT /me)を送ったかも控える(届かなかったとき、どこで止まったかを出すため)
+  const sentLogin = page
+    .waitForRequest((req) => req.method() === "PUT" && new URL(req.url()).pathname === "/me", {
+      timeout: 10_000,
+    })
+    .then(() => true)
+    .catch(() => false);
   await page.getByRole("button", { name: "ログイン" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "旅の一覧" })).toBeVisible();
+  const heading = page.getByRole("heading", { level: 1, name: "旅の一覧" });
+  try {
+    await expect(heading).toBeVisible();
+  } catch (error) {
+    const focused = await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 80));
+    throw new Error(
+      `ログインできなかった。API(PUT /me)を${(await sentLogin) ? "送った" : "送っていない"}。` +
+        `フォーカス: ${focused}`,
+      { cause: error },
+    );
+  }
   return page;
+}
+
+/**
+ * 日本語を入れて、確定を済ませる。
+ * Playwright の Firefox は日本語を「変換の確定」として入れる。遅い環境では確定の処理が終わる前に
+ * 次のボタンを押すと、押下が確定の処理に吸われることがある(CI で一度、ログインの押下が届かなかった)。
+ * 人と同じく、欄から出て確定を済ませてから次の操作をする。
+ */
+export async function fillJapanese(field: Locator, value: string) {
+  await field.fill(value);
+  await field.blur();
+  await expect(field).toHaveValue(value);
 }
 
 /** 旅を作り、その旅の画面を開いた状態にする */

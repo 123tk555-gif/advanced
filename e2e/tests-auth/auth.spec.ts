@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "../tests/fixtures.js";
-import { createTrip, joinAndApprove, openTab } from "../tests/helpers.js";
+import { createTrip, fillJapanese, joinAndApprove, openTab } from "../tests/helpers.js";
 
 /**
  * メールアドレスとパスワードのログイン(画面一覧 S01〜S04)。
@@ -16,7 +16,7 @@ async function signUp(page: Page, email: string, name: string, password = PASSWO
   await page.goto("/signup");
   await page.getByLabel("メールアドレス").fill(email);
   await page.getByLabel(/^パスワード/).fill(password);
-  await page.getByLabel(/^表示名/).fill(name);
+  await fillJapanese(page.getByLabel(/^表示名/), name);
   await page.getByRole("button", { name: "登録して確認コードを送る" }).click();
   await expect(page.getByRole("heading", { name: "確認コードの入力" })).toBeVisible();
   await expect(page.getByLabel("メールアドレス")).toHaveValue(email);
