@@ -1,4 +1,5 @@
-import { expect, type Locator, test } from "@playwright/test";
+import type { Locator } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { createTrip, openAs } from "./helpers.js";
 
 /** 標準の日付欄はブラウザの言語で並びが変わるので、英語のブラウザで確かめる */

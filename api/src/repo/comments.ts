@@ -1,5 +1,5 @@
 import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { type CommentCreate, MAX_COMMENTS_PER_ITEM } from "@tritri/shared";
+import { type CommentCreate, MAX_COMMENTS_PER_ITEM, MAX_COMMENTS_PER_TRIP } from "@tritri/shared";
 import { ulid } from "ulid";
 import type { Deps } from "../context.js";
 import { deleteAll, queryKeys } from "../db/batch.js";
@@ -47,6 +47,7 @@ export function groupComments(
 /**
  * コメントを書く。予定があること・予定ごとの件数の上限を、同じトランザクションで確かめる。
  * 件数は予定の commentCount で数える(予定の version は変えないので、同時編集の邪魔をしない)。
+ * 旅全体の件数も META の commentCount で数え、上限を守る(旅の画面の応答の大きさを抑えるため)。
  */
 export async function createComment(
   deps: Deps,
@@ -54,7 +55,7 @@ export async function createComment(
   itemId: string,
   me: Member,
   input: CommentCreate,
-): Promise<{ comment: Comment } | { error: "not_found" | "too_many" }> {
+): Promise<{ comment: Comment } | { error: "not_found" | "too_many" | "too_many_in_trip" }> {
   const comment: Comment = {
     commentId: ulid(),
     itemId,
@@ -94,13 +95,25 @@ export async function createComment(
                 },
               },
             },
+            {
+              Update: {
+                TableName: deps.tableName,
+                Key: keys.tripMeta(tripId),
+                UpdateExpression: "SET commentCount = if_not_exists(commentCount, :zero) + :one",
+                ConditionExpression:
+                  "attribute_exists(PK) AND (attribute_not_exists(commentCount) OR commentCount < :max)",
+                ExpressionAttributeValues: { ":zero": 0, ":one": 1, ":max": MAX_COMMENTS_PER_TRIP },
+              },
+            },
           ],
         }),
       ),
     );
     return { comment };
   } catch (error) {
-    if (failedConditionIndex(error) !== 1) throw error;
+    const index = failedConditionIndex(error);
+    if (index === 2) return { error: "too_many_in_trip" };
+    if (index !== 1) throw error;
     const item = await deps.db.send(
       new GetCommand({
         TableName: deps.tableName,
@@ -148,6 +161,15 @@ export async function deleteComment(
                 ExpressionAttributeValues: { ":one": 1 },
               },
             },
+            {
+              Update: {
+                TableName: deps.tableName,
+                Key: keys.tripMeta(tripId),
+                UpdateExpression: "SET commentCount = if_not_exists(commentCount, :one) - :one",
+                ConditionExpression: "attribute_exists(PK)",
+                ExpressionAttributeValues: { ":one": 1 },
+              },
+            },
           ],
         }),
       ),
@@ -156,8 +178,8 @@ export async function deleteComment(
   } catch (error) {
     const index = failedConditionIndex(error);
     if (index === 0) return "not_found";
-    if (index === 1) {
-      // 予定はもう無い: コメントだけ消す
+    if (index === 1 || index === 2) {
+      // 予定(か旅)はもう無い: コメントだけ消す。旅全体の件数は、予定を消したときに減らしてある
       await deleteAll(deps, [key]);
       return "deleted";
     }

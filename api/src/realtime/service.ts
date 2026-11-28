@@ -49,7 +49,13 @@ export function createRealtime(deps: RealtimeDeps): Realtime {
       ),
     ]);
     if (!meta.Item) return new Map();
-    return new Map((members.Items ?? []).map(toMember).map((m) => [m.userId, m.displayName]));
+    // 退会した人は、メンバー情報が残っていても数えない
+    return new Map(
+      (members.Items ?? [])
+        .map(toMember)
+        .filter((m) => !m.withdrawn)
+        .map((m) => [m.userId, m.displayName]),
+    );
   }
 
   async function drop(connection: Connection, reason: "revoked" | "stale") {

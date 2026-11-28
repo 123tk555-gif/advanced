@@ -26,9 +26,17 @@ async function load() {
       return;
     }
     info.value = next;
+    errors.value = [];
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) notFound.value = true;
-    else errors.value = [errorMessage(error)];
+    if (error instanceof ApiError && error.status === 404) {
+      if (info.value?.status === "pending") {
+        // 承認を待つ間にリンクが止められた・発行し直された。承認されていれば旅の一覧に出る
+        toast("招待リンクが変わりました。承認されていれば、旅の一覧に出ています");
+        await navigateTo("/trips", { replace: true });
+        return;
+      }
+      notFound.value = true;
+    } else errors.value = [errorMessage(error)];
   }
 }
 await load();

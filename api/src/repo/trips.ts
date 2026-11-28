@@ -12,6 +12,7 @@ import {
   settle,
   type Transfer,
   type TripInput,
+  tripDays,
 } from "@tritri/shared";
 import { ulid } from "ulid";
 import type { Deps } from "../context.js";
@@ -45,6 +46,8 @@ export interface Member {
   displayName: string;
   role: Role;
   joinedAt: string;
+  /** 退会した人。名前は「退会した会員」で、旅は開けない(支出などの記録のために残す) */
+  withdrawn?: true;
 }
 
 const TRIP_FIELDS = [
@@ -75,6 +78,7 @@ export function toMember(item: Record<string, unknown>): Member {
     displayName: item.displayName as string,
     role: item.role as Role,
     joinedAt: item.joinedAt as string,
+    ...(item.withdrawn === true ? { withdrawn: true } : {}),
   };
 }
 
@@ -139,6 +143,9 @@ export async function createTrip(
               type: "trip",
               ...trip,
               joinRequestCount: 0,
+              // 日程の日数(予定の追加・移動の条件に使う)と、予定の配置の版
+              dayCount: tripDays(input.startDate, input.endDate),
+              planRev: 0,
               inviteToken: invite.token,
               inviteExpiresAt: invite.expiresAt,
             },

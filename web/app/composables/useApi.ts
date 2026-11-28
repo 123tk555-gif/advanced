@@ -1,3 +1,5 @@
+import { sendWithToken } from "~/utils/auth/retry";
+
 /** API がエラーを返したとき(status と、API の error コード) */
 export class ApiError extends Error {
   constructor(
@@ -9,35 +11,39 @@ export class ApiError extends Error {
   }
 }
 
-/** 開発用 API で、ログイン中の利用者を伝えるヘッダー(本番は Cognito のトークンを送る) */
-const DEV_USER_HEADER = "x-dev-user-id";
-
-/** API を呼ぶ。ログイン中なら利用者を添え、失敗したら ApiError を投げる */
+/** API を呼ぶ。ログイン中ならトークンを添え(期限切れなら 1 回だけ取り直す)、失敗したら ApiError を投げる */
 export function useApi() {
   const config = useRuntimeConfig();
-  const { user, logout } = useAuth();
+  const auth = useAuth();
 
   async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-    const headers: Record<string, string> = {};
-    if (user.value) headers[DEV_USER_HEADER] = user.value.userId;
-    if (body !== undefined) headers["content-type"] = "application/json";
+    const send = (token: string | null) =>
+      fetch(`${config.public.apiBase}${path}`, {
+        method,
+        headers: {
+          ...(token ? auth.headerFor(token) : {}),
+          ...(body !== undefined ? { "content-type": "application/json" } : {}),
+        },
+        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      });
 
     let res: Response;
     try {
-      res = await fetch(`${config.public.apiBase}${path}`, {
-        method,
-        headers,
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-      });
+      res = await sendWithToken(send, (force) => auth.token(force));
     } catch {
       throw new ApiError(0, "NETWORK", null);
     }
     const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    let data: unknown = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      // 途中の仕組み(中継・ゲートウェイ)が JSON でない応答を返すことがある
+    }
     if (!res.ok) {
-      if (res.status === 401 && user.value) {
+      if (res.status === 401 && auth.user.value) {
         // ログインが切れた: ログイン画面へ
-        logout();
+        await auth.logout();
         await navigateTo({ path: "/login", query: { returnTo: useRoute().fullPath } });
       }
       throw new ApiError(res.status, (data as { error?: string } | null)?.error ?? "UNKNOWN", data);
@@ -67,6 +73,9 @@ export function errorMessage(error: unknown): string {
     TOO_MANY_IDEAS: "候補は 1 つの旅に 100 件までです",
     TOO_MANY_EXPENSES: "支出は 1 つの旅に 500 件までです",
     TOO_MANY_COMMENTS: "コメントは 1 つの予定に 200 件までです",
+    TOO_MANY_TRIP_COMMENTS: "コメントは 1 つの旅に 2,000 件までです",
+    BUSY: "混み合っています。少し待ってから、もう一度試してください",
+    INTERNAL: "うまくいきませんでした。もう一度試してください",
     TOO_MANY_JOIN_REQUESTS: "この旅は申請が多いため、今は申請できません",
     DAY_OUT_OF_RANGE: "旅の日数の範囲で日にちを選んでください",
     ITEMS_OUT_OF_RANGE: "予定がある日より短くはできません。先に予定を動かしてください",
@@ -76,6 +85,7 @@ export function errorMessage(error: unknown): string {
     OWNER_MUST_TRANSFER: "オーナーは、先にほかのメンバーにオーナーを引き継いでください",
     VERSION_CONFLICT: "ほかの人が先に変更しました",
     PAYLOAD_TOO_LARGE: "内容が大きすぎます",
+    PROFILE_REQUIRED: "先に表示名を登録してください",
   };
   return messages[error.code] ?? "うまくいきませんでした。もう一度試してください";
 }

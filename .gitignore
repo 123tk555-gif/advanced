@@ -3,6 +3,7 @@ dist/
 .output/
 .nuxt/
 .nuxt-e2e/
+.nuxt-e2e-auth/
 cdk.out/
 coverage/
 .env
@@ -13,3 +14,9 @@ coverage/
 # ブラウザでの操作テストの結果
 e2e/test-results/
 e2e/playwright-report/
+
+# 負荷試験の作業用(準備データ・生の記録)
+load/.work/
+
+# 予算の通知の送り先など、手元だけの CDK の設定(git に入れない)
+infra/cdk.context.json

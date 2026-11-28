@@ -20,7 +20,9 @@ export function useTripRealtime(
 ) {
   const api = useApi();
   const { user } = useAuth();
-  const wsBase = useRuntimeConfig().public.apiBase.replace(/^http/, "ws");
+  const config = useRuntimeConfig().public;
+  // 本番は API Gateway WebSocket の URL(wss://…/prod)。手元は開発用 API の /ws
+  const wsUrl = config.wsUrl ? String(config.wsUrl) : `${config.apiBase.replace(/^http/, "ws")}/ws`;
 
   const state = ref<SocketState>("connecting");
   const people = ref<Viewer[]>([]);
@@ -40,7 +42,7 @@ export function useTripRealtime(
     getTicket: async () =>
       (await api.post<{ ticket: string }>(`/trips/${tripId}/ws-ticket`)).ticket,
     open: (ticket) =>
-      new WebSocket(`${wsBase}/ws?ticket=${encodeURIComponent(ticket)}`) as unknown as ReturnType<
+      new WebSocket(`${wsUrl}?ticket=${encodeURIComponent(ticket)}`) as unknown as ReturnType<
         Parameters<typeof createTripSocket>[0]["open"]
       >,
     isGone: (error) => error instanceof ApiError && (error.status === 404 || error.status === 401),

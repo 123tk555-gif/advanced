@@ -15,10 +15,14 @@ const view = ref<TripView | null>(null);
 const notFound = ref(false);
 const form = ref<TripFields>({ title: "", startDate: "", endDate: "", destination: "" });
 const errors = ref<string[]>([]);
+const loadError = ref("");
 
-async function load() {
+/** keepForm: 旅の情報の欄は書き換えない(公開リンクの発行など、別の操作の後) */
+async function load(keepForm = false) {
   try {
     view.value = await api.get<TripView>(`/trips/${tripId.value}`);
+    loadError.value = "";
+    if (keepForm) return;
     const t = view.value.trip;
     form.value = {
       title: t.title,
@@ -28,16 +32,18 @@ async function load() {
     };
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) notFound.value = true;
-    else toast(errorMessage(error));
+    else loadError.value = errorMessage(error);
   }
 }
 await load();
 useHead(() => ({ title: `${view.value?.trip.title ?? "旅"} の設定 | Tri-Tri` }));
 
 const owner = computed(() => view.value?.myRole === "owner");
+// 退会した人は、外せるが、オーナーは引き継げない
 const others = computed(
   () => view.value?.members.filter((m) => m.userId !== user.value?.userId) ?? [],
 );
+const successors = computed(() => others.value.filter((m) => !m.withdrawn));
 const publicLink = computed(() =>
   view.value?.public ? `${window.location.origin}/p/${view.value.public.token}` : "",
 );
@@ -62,7 +68,7 @@ async function run(action: () => Promise<unknown>, done: string) {
   } catch (error) {
     toast(errorMessage(error));
   }
-  await load();
+  await load(true);
 }
 
 const issuePublic = () =>
@@ -151,6 +157,7 @@ async function deleteTrip() {
 <template>
   <div class="narrow-page">
     <NotFoundView v-if="notFound" />
+    <p v-else-if="loadError && !view" class="errors" role="alert">{{ loadError }}</p>
     <template v-else-if="view">
       <p>
         <NuxtLink :to="`/trips/${tripId}`">← {{ view.trip.title }} に戻る</NuxtLink>
@@ -214,7 +221,7 @@ async function deleteTrip() {
             <div class="invite-box">
               <select id="transfer-to" v-model="transferTo">
                 <option value="" disabled>引き継ぐ人を選ぶ</option>
-                <option v-for="m in others" :key="m.userId" :value="m.userId">
+                <option v-for="m in successors" :key="m.userId" :value="m.userId">
                   {{ m.displayName }}
                 </option>
               </select>

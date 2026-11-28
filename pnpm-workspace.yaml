@@ -3,6 +3,7 @@ packages:
   - api
   - web
   - e2e
+  - infra
 
 # インストール時にスクリプトの実行を許す部品(それ以外は pnpm が止める)
 allowBuilds:

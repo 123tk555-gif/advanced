@@ -28,6 +28,8 @@ export interface Member {
   userId: string;
   displayName: string;
   role: Role;
+  /** 退会した人(名前は「退会した会員」) */
+  withdrawn?: true;
   joinedAt: string;
 }
 

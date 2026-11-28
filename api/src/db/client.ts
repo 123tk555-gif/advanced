@@ -13,6 +13,8 @@ export function createDocClient(options: { endpoint?: string } = {}): DynamoDBDo
         credentials: { accessKeyId: "local", secretAccessKey: "local" },
       })
     : new DynamoDBClient({});
+  // ログを出さないのに、応答のたびにログ用の整形をする部品を外す(負荷試験で CPU の約 6%)
+  client.middlewareStack.remove("loggerMiddleware");
   return DynamoDBDocumentClient.from(client, {
     marshallOptions: { removeUndefinedValues: true },
   });

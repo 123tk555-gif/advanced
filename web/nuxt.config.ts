@@ -19,11 +19,33 @@ export default defineNuxtConfig({
     public: {
       // API の場所。手元の開発では開発用 API サーバー。NUXT_PUBLIC_API_BASE で上書きできる
       apiBase: "http://127.0.0.1:8787",
+      // リアルタイム更新の WebSocket の URL(NUXT_PUBLIC_WS_URL)。空なら API の場所の /ws(手元の開発用)
+      wsUrl: "",
       // Google マップの API キー(NUXT_PUBLIC_GOOGLE_MAPS_API_KEY)。空なら仮の地図で動く。
       // 画面に埋め込まれて誰でも見られるので、Google Cloud でリファラーと API の種類を必ず制限する
       googleMapsApiKey: "",
       // 地図のスタイルの ID(NUXT_PUBLIC_GOOGLE_MAPS_MAP_ID)。空なら Google の試用 ID を使う
       googleMapsMapId: "",
+      // ログインの仕組み。Cognito のユーザープール ID とアプリのクライアント ID があれば本番のログイン
+      // (NUXT_PUBLIC_COGNITO_USER_POOL_ID・NUXT_PUBLIC_COGNITO_CLIENT_ID。どちらも画面に埋め込まれて構わない値)
+      cognitoUserPoolId: "",
+      cognitoClientId: "",
+      // Cognito が無いときの仕組み(NUXT_PUBLIC_AUTH_MODE)。"fake" なら試験用のメールとパスワードのログイン、
+      // 空なら開発用(利用者 ID と表示名だけ)
+      authMode: "",
+    },
+  },
+  vite: {
+    optimizeDeps: {
+      // 開発用サーバーは、初めて見る部品をその場でまとめ直し、画面を読み込み直す。
+      // 操作の途中で読み込み直すと自動テストが途切れる(遅い CI の最初のテストで起きた)ので、起動のときに先にまとめる
+      include: [
+        "aws-amplify",
+        "aws-amplify/auth",
+        "fractional-indexing",
+        "@googlemaps/js-api-loader",
+        "@tritri/shared > zod",
+      ],
     },
   },
   typescript: {

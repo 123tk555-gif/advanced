@@ -9,7 +9,12 @@ import {
 } from "@tritri/shared";
 import { ulid } from "ulid";
 import type { Deps } from "../context.js";
-import { failedConditionIndex, retryOnConflict, type TransactItem } from "../db/errors.js";
+import {
+  BusyError,
+  failedConditionIndex,
+  retryOnConflict,
+  type TransactItem,
+} from "../db/errors.js";
 import { keys } from "../db/table.js";
 import { getTripMeta } from "./trips.js";
 
@@ -45,6 +50,21 @@ export function toItem(record: Record<string, unknown>): Item {
 
 type Failure = { error: "not_found" } | { error: "day_out_of_range" };
 
+/**
+ * 旅の情報(META)の条件で書き込みが断られたときの理由。
+ * META の条件には「旅がある・件数の上限・日程の範囲」をまとめて書いているので、読み直して見分ける
+ */
+export async function metaFailure(
+  deps: Deps,
+  tripId: string,
+  day: number | undefined,
+): Promise<"not_found" | "day_out_of_range" | "too_many"> {
+  const meta = await getTripMeta(deps, tripId);
+  if (!meta) return "not_found";
+  if (day !== undefined && day > Number(meta.dayCount)) return "day_out_of_range";
+  return "too_many";
+}
+
 /** 指定した日が、旅の日数の範囲にあるか */
 export async function checkDay(
   deps: Deps,
@@ -59,7 +79,7 @@ export async function checkDay(
   return undefined;
 }
 
-async function getItem(deps: Deps, tripId: string, itemId: string): Promise<Item | undefined> {
+async function getItemRecord(deps: Deps, tripId: string, itemId: string) {
   const res = await deps.db.send(
     new GetCommand({
       TableName: deps.tableName,
@@ -67,7 +87,12 @@ async function getItem(deps: Deps, tripId: string, itemId: string): Promise<Item
       ConsistentRead: true,
     }),
   );
-  return res.Item ? toItem(res.Item) : undefined;
+  return res.Item;
+}
+
+async function getItem(deps: Deps, tripId: string, itemId: string): Promise<Item | undefined> {
+  const record = await getItemRecord(deps, tripId, itemId);
+  return record ? toItem(record) : undefined;
 }
 
 /** 書き込みの条件に合わなかったとき: 無ければ not_found、あれば今の内容を添えて conflict */
@@ -92,7 +117,9 @@ export function newItem(
 }
 
 /**
- * 予定を作る書き込み 2 つ(予定を作る・旅の予定の件数を数えて上限を守る)。
+ * 予定を作る書き込み 2 つ(予定を作る・旅の予定の件数を数えて上限と日程の範囲を守る)。
+ * 日程の範囲は META の dayCount で確かめる(旅の日程の短縮と同時に書かれても、日程の外に残らない)。
+ * planRev は予定の配置が変わるたびに増やす(日程の短縮が、その間の変化に気づけるように)。
  * 候補の採用など、ほかのトランザクションにも組み込めるように分けている。
  */
 export function itemCreateWrites(deps: Deps, tripId: string, item: Item): TransactItem[] {
@@ -108,10 +135,15 @@ export function itemCreateWrites(deps: Deps, tripId: string, item: Item): Transa
       Update: {
         TableName: deps.tableName,
         Key: keys.tripMeta(tripId),
-        UpdateExpression: "SET itemCount = if_not_exists(itemCount, :zero) + :one",
+        UpdateExpression: "SET itemCount = if_not_exists(itemCount, :zero) + :one ADD planRev :one",
         ConditionExpression:
-          "attribute_exists(PK) AND (attribute_not_exists(itemCount) OR itemCount < :max)",
-        ExpressionAttributeValues: { ":zero": 0, ":one": 1, ":max": MAX_ITEMS_PER_TRIP },
+          "attribute_exists(PK) AND (attribute_not_exists(itemCount) OR itemCount < :max) AND dayCount >= :day",
+        ExpressionAttributeValues: {
+          ":zero": 0,
+          ":one": 1,
+          ":max": MAX_ITEMS_PER_TRIP,
+          ":day": item.day,
+        },
       },
     },
   ];
@@ -136,7 +168,8 @@ export async function createItem(
     );
     return { item };
   } catch (error) {
-    if (failedConditionIndex(error) === 1) return { error: "too_many" };
+    if (failedConditionIndex(error) === 1)
+      return { error: await metaFailure(deps, tripId, item.day) };
     throw error;
   }
 }
@@ -172,6 +205,49 @@ export async function updateItem(
     sets.push(`#${field} = :${field}`);
   }
 
+  if (changes.day !== undefined) {
+    // 日を変えるときは、日程の範囲を META で確かめ、配置が変わったことも残す
+    try {
+      await retryOnConflict(() =>
+        deps.db.send(
+          new TransactWriteCommand({
+            TransactItems: [
+              {
+                Update: {
+                  TableName: deps.tableName,
+                  Key: keys.item(tripId, itemId),
+                  UpdateExpression: `SET ${sets.join(", ")}`,
+                  ConditionExpression: "attribute_exists(PK) AND version = :expected",
+                  ExpressionAttributeNames: names,
+                  ExpressionAttributeValues: values,
+                },
+              },
+              {
+                Update: {
+                  TableName: deps.tableName,
+                  Key: keys.tripMeta(tripId),
+                  UpdateExpression: "ADD planRev :one",
+                  ConditionExpression: "attribute_exists(PK) AND dayCount >= :day",
+                  ExpressionAttributeValues: { ":one": 1, ":day": changes.day },
+                },
+              },
+            ],
+          }),
+        ),
+      );
+    } catch (error) {
+      const index = failedConditionIndex(error);
+      if (index === 0) return conflictOrNotFound(deps, tripId, itemId);
+      if (index === 1) {
+        const reason = await metaFailure(deps, tripId, changes.day);
+        return { error: reason === "not_found" ? "not_found" : "day_out_of_range" };
+      }
+      throw new BusyError();
+    }
+    const item = await getItem(deps, tripId, itemId);
+    return item ? { item } : { error: "not_found" };
+  }
+
   try {
     const res = await deps.db.send(
       new UpdateCommand({
@@ -191,13 +267,19 @@ export async function updateItem(
   }
 }
 
-/** A8: 予定の削除(楽観ロック)。件数も同じトランザクションで減らす */
+/**
+ * A8: 予定の削除(楽観ロック)。予定の件数と、旅全体のコメントの件数も同じトランザクションで減らす。
+ * コメントの本文は、消した後に別に片付ける(app.ts)
+ */
 export async function deleteItem(
   deps: Deps,
   tripId: string,
   itemId: string,
   version: number,
 ): Promise<{ deleted: true } | { error: "not_found" } | { error: "conflict"; current: Item }> {
+  const record = await getItemRecord(deps, tripId, itemId);
+  if (!record) return { error: "not_found" };
+  const comments = Number(record.commentCount ?? 0);
   try {
     await retryOnConflict(() =>
       deps.db.send(
@@ -207,18 +289,21 @@ export async function deleteItem(
               Delete: {
                 TableName: deps.tableName,
                 Key: keys.item(tripId, itemId),
-                ConditionExpression: "attribute_exists(PK) AND version = :expected",
-                ExpressionAttributeValues: { ":expected": version },
+                // 読んでからコメントが増減していたら、件数がずれないようにやり直してもらう
+                ConditionExpression:
+                  "attribute_exists(PK) AND version = :expected AND (attribute_not_exists(commentCount) OR commentCount = :comments)",
+                ExpressionAttributeValues: { ":expected": version, ":comments": comments },
               },
             },
             {
               Update: {
                 TableName: deps.tableName,
                 Key: keys.tripMeta(tripId),
-                UpdateExpression: "SET itemCount = itemCount - :one",
+                UpdateExpression:
+                  "SET itemCount = if_not_exists(itemCount, :one) - :one, commentCount = if_not_exists(commentCount, :comments) - :comments ADD planRev :one",
                 // 旅が消えていたら書かない(消えた旅の META を作り直さないように)
                 ConditionExpression: "attribute_exists(PK)",
-                ExpressionAttributeValues: { ":one": 1 },
+                ExpressionAttributeValues: { ":one": 1, ":comments": comments },
               },
             },
           ],

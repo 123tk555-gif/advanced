@@ -31,6 +31,9 @@ export default defineConfig({
         ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}),
       },
     },
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "mobile", use: { ...devices["Pixel 7"] } },
   ],
   webServer: [
     {

@@ -1,0 +1,100 @@
+{
+  "id": "L5",
+  "quick": false,
+  "began": "2026-11-23T07:41:58.370Z",
+  "ended": "2026-11-23T07:42:29.075Z",
+  "result": {
+    "steps": [
+      {
+        "comments": 0,
+        "status": 200,
+        "ms": 405,
+        "bytes": 1643494,
+        "rcu": 578,
+        "rcuFor50": 28900,
+        "pages": 3,
+        "public": {
+          "status": 200,
+          "ms": 297,
+          "bytes": 1084417
+        },
+        "patchMs": 61
+      },
+      {
+        "comments": 1000,
+        "status": 200,
+        "ms": 477,
+        "bytes": 2423779,
+        "rcu": 779,
+        "rcuFor50": 38950,
+        "pages": 4,
+        "public": {
+          "status": 200,
+          "ms": 418,
+          "bytes": 1084402
+        },
+        "patchMs": 69
+      },
+      {
+        "comments": 2000,
+        "status": 200,
+        "ms": 567,
+        "bytes": 3204379,
+        "rcu": 979,
+        "rcuFor50": 48950,
+        "pages": 4,
+        "public": {
+          "status": 200,
+          "ms": 482,
+          "bytes": 1084402
+        },
+        "patchMs": 69
+      }
+    ],
+    "deleteItem": {
+      "status": 204,
+      "ms": 71
+    },
+    "overLimit": {
+      "status": 409,
+      "error": "TOO_MANY_TRIP_COMMENTS"
+    },
+    "deleteTrip": {
+      "status": 204,
+      "ms": 47,
+      "cleanupMs": 6807,
+      "leftovers": 0
+    },
+    "pass": {
+      "responseUnder6MB": true,
+      "readUnder29s": true,
+      "deleteUnder29s": true,
+      "overLimitRejected": true
+    }
+  },
+  "server": {
+    "samples": 4,
+    "maxRssMb": 171,
+    "maxCpuPct": 49,
+    "maxLoopP99Ms": 54,
+    "trend": [
+      {
+        "rssMb": 109,
+        "heapMb": 32
+      },
+      {
+        "rssMb": 85,
+        "heapMb": 23
+      },
+      {
+        "rssMb": 126,
+        "heapMb": 25
+      },
+      {
+        "rssMb": 171,
+        "heapMb": 57
+      }
+    ],
+    "errorLines": []
+  }
+}

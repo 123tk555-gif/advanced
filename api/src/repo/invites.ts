@@ -1,7 +1,7 @@
 import { GetCommand, QueryCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { MAX_MEMBERS, MAX_PENDING_JOIN_REQUESTS } from "@tritri/shared";
 import type { Deps } from "../context.js";
-import { failedConditionIndex, retryOnConflict } from "../db/errors.js";
+import { failedConditionIndex, retryOnConflict, retryWhenChanged } from "../db/errors.js";
 import { keys } from "../db/table.js";
 import type { Profile } from "./profiles.js";
 import {
@@ -167,7 +167,9 @@ export async function approveJoin(
                   tripId,
                   ...member,
                 },
-                ConditionExpression: "attribute_not_exists(PK)",
+                // 退会した同じ ID の人が申請し直した場合は、新しいメンバーとして作り直す(手元の開発用ログインだけで起きる)
+                ConditionExpression: "attribute_not_exists(PK) OR withdrawn = :yes",
+                ExpressionAttributeValues: { ":yes": true },
               },
             },
             {
@@ -241,7 +243,7 @@ export async function replaceInvite(
   tripId: string,
   next: "new" | null,
 ): Promise<Invite | null> {
-  return retryOnConflict(async () => {
+  return retryWhenChanged(async () => {
     const meta = await getTripMeta(deps, tripId);
     if (!meta) throw new Error(`trip not found: ${tripId}`);
     const old = toInvite(meta);

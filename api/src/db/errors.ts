@@ -26,10 +26,46 @@ export async function retryOnConflict<T>(run: () => Promise<T>, attempts = 5): P
     try {
       return await run();
     } catch (error) {
-      if (i >= attempts || !(error instanceof TransactionCanceledException)) throw error;
+      if (!(error instanceof TransactionCanceledException)) throw error;
       const reasons = error.CancellationReasons ?? [];
       if (!reasons.some((r) => r.Code === "TransactionConflict")) throw error;
+      if (i >= attempts) throw new BusyError();
       await new Promise((resolve) => setTimeout(resolve, 20 * i + Math.random() * 30));
     }
   }
+}
+
+/**
+ * 読んでから書くまでの間に、ほかの操作で変わっていた(条件に合わなかった)ときも、読み直してやり直す。
+ * 招待・公開リンクの発行し直しのように、最後の操作が勝てばよいものに使う
+ */
+export async function retryWhenChanged<T>(run: () => Promise<T>, attempts = 8): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await retryOnConflict(run);
+    } catch (error) {
+      const changed =
+        error instanceof TransactionCanceledException &&
+        (error.CancellationReasons ?? []).some((r) => r.Code === "ConditionalCheckFailed");
+      if (!changed) throw error;
+      if (i >= attempts) throw new BusyError();
+      await new Promise((resolve) => setTimeout(resolve, 10 * i + Math.random() * 40));
+    }
+  }
+}
+
+/** 同時の書き込みが続いて、やり直しても通らなかった(503 BUSY にする) */
+export class BusyError extends Error {
+  constructor() {
+    super("busy");
+  }
+}
+
+/** 同時の書き込みとぶつかって取り消されたか */
+export function isConflict(error: unknown): boolean {
+  return (
+    error instanceof BusyError ||
+    (error instanceof TransactionCanceledException &&
+      (error.CancellationReasons ?? []).some((r) => r.Code === "TransactionConflict"))
+  );
 }

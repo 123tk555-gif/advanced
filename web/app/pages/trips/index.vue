@@ -3,9 +3,22 @@ import type { MyTrip } from "~/types/api";
 
 useHead({ title: "旅の一覧 | Tri-Tri" });
 const api = useApi();
-const { data, error } = await useAsyncData("my-trips", () =>
+const { data, error, refresh } = await useAsyncData("my-trips", () =>
   api.get<{ trips: MyTrip[]; pending: { title: string; requestedAt: string }[] }>("/trips"),
 );
+
+// 別のタブ・別の人の操作で増えた旅も出るよう、画面に戻ったときに読み直す
+function onVisible() {
+  if (document.visibilityState === "visible") void refresh();
+}
+onMounted(() => {
+  window.addEventListener("focus", onVisible);
+  document.addEventListener("visibilitychange", onVisible);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("focus", onVisible);
+  document.removeEventListener("visibilitychange", onVisible);
+});
 </script>
 
 <template>

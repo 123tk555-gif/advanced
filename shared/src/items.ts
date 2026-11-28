@@ -91,6 +91,8 @@ export type IdeaAdopt = z.infer<typeof ideaAdopt>;
 
 /** 1 つの予定のコメントの上限 */
 export const MAX_COMMENTS_PER_ITEM = 200;
+/** 1 つの旅のコメントの上限(旅の画面の応答を AWS Lambda の上限 6MB に収めるため) */
+export const MAX_COMMENTS_PER_TRIP = 2000;
 
 export const commentCreate = z.object({ body: z.string().trim().min(1).max(200) });
 export type CommentCreate = z.infer<typeof commentCreate>;

@@ -1,0 +1,147 @@
+{
+  "id": "L5",
+  "quick": false,
+  "began": "2026-11-23T02:27:01.106Z",
+  "ended": "2026-11-23T02:30:32.363Z",
+  "result": {
+    "steps": [
+      {
+        "comments": 0,
+        "status": 200,
+        "ms": 467,
+        "bytes": 1643494,
+        "rcu": 578,
+        "rcuFor50": 28900,
+        "pages": 3,
+        "public": {
+          "status": 200,
+          "ms": 319,
+          "bytes": 1084417
+        },
+        "patchMs": 84
+      },
+      {
+        "comments": 1000,
+        "status": 200,
+        "ms": 479,
+        "bytes": 2423779,
+        "rcu": 779,
+        "rcuFor50": 38950,
+        "pages": 4,
+        "public": {
+          "status": 200,
+          "ms": 429,
+          "bytes": 1084402
+        },
+        "patchMs": 73
+      },
+      {
+        "comments": 5000,
+        "status": 200,
+        "ms": 1039,
+        "bytes": 5546179,
+        "rcu": 1582,
+        "rcuFor50": 79100,
+        "pages": 7,
+        "public": {
+          "status": 200,
+          "ms": 929,
+          "bytes": 1084402
+        },
+        "patchMs": 49
+      },
+      {
+        "comments": 10000,
+        "status": 200,
+        "ms": 1611,
+        "bytes": 9449179,
+        "rcu": 2586,
+        "rcuFor50": 129300,
+        "pages": 11,
+        "public": {
+          "status": 200,
+          "ms": 1479,
+          "bytes": 1084402
+        },
+        "patchMs": 57
+      },
+      {
+        "comments": 30000,
+        "status": 200,
+        "ms": 10880,
+        "bytes": 25061179,
+        "rcu": 6604,
+        "rcuFor50": 330200,
+        "pages": 26,
+        "public": {
+          "status": 200,
+          "ms": 7943,
+          "bytes": 1084402
+        },
+        "patchMs": 60
+      },
+      {
+        "comments": 60000,
+        "status": 200,
+        "ms": 20406,
+        "bytes": 48479179,
+        "rcu": 12630,
+        "rcuFor50": 631500,
+        "pages": 50,
+        "public": {
+          "status": 200,
+          "ms": 22072,
+          "bytes": 1084402
+        },
+        "patchMs": 76
+      }
+    ],
+    "deleteItem": {
+      "status": 204,
+      "ms": 243
+    },
+    "deleteTrip": {
+      "status": 204,
+      "ms": 64380,
+      "leftovers": 0
+    },
+    "pass": {
+      "responseUnder6MB": false,
+      "readUnder29s": true,
+      "deleteUnder29s": false
+    }
+  },
+  "server": {
+    "samples": 40,
+    "maxRssMb": 331,
+    "maxCpuPct": 49,
+    "maxLoopP99Ms": 64,
+    "trend": [
+      {
+        "rssMb": 179,
+        "heapMb": 38
+      },
+      {
+        "rssMb": 157,
+        "heapMb": 29
+      },
+      {
+        "rssMb": 96,
+        "heapMb": 23
+      },
+      {
+        "rssMb": 258,
+        "heapMb": 62
+      },
+      {
+        "rssMb": 296,
+        "heapMb": 79
+      },
+      {
+        "rssMb": 296,
+        "heapMb": 70
+      }
+    ],
+    "errorLines": []
+  }
+}

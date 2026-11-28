@@ -101,9 +101,11 @@ function openAdopt(idea: Idea) {
   adopting.value = idea;
   adoptDay.value = 1;
 }
+const adoptBusy = ref(false);
 async function adopt() {
   const idea = adopting.value;
-  if (!idea) return;
+  if (!idea || adoptBusy.value) return;
+  adoptBusy.value = true;
   try {
     await api.post(`/trips/${tripId.value}/ideas/${idea.ideaId}/adopt`, {
       day: adoptDay.value,
@@ -112,6 +114,8 @@ async function adopt() {
     toast(`「${idea.name}」を ${adoptDay.value}日目に入れました`);
   } catch (error) {
     toast(errorMessage(error));
+  } finally {
+    adoptBusy.value = false;
   }
   adopting.value = null;
   emit("changed");

@@ -1,0 +1,89 @@
+{
+  "id": "L1",
+  "quick": false,
+  "began": "2026-11-23T06:45:44.199Z",
+  "ended": "2026-11-23T06:46:51.887Z",
+  "result": {
+    "code": 0,
+    "metrics": {
+      "checks": {
+        "fails": 0,
+        "rate": 1,
+        "passes": 2255,
+        "thresholds": {
+          "rate==1": true
+        }
+      },
+      "app_write_ms": {
+        "p(95)": 48.5112762,
+        "p(99)": 78.88066116,
+        "max": 347.913175,
+        "count": 1925,
+        "avg": 23.224969956363623,
+        "min": 6.521073,
+        "med": 19.389294,
+        "p(90)": 37.43875300000002
+      },
+      "app_read_ms": {
+        "med": 8.9898755,
+        "p(90)": 18.2234188,
+        "p(95)": 25.001041500000003,
+        "p(99)": 60.98982118999993,
+        "max": 93.045626,
+        "count": 330,
+        "avg": 11.354156103030315,
+        "min": 3.967031
+      },
+      "http_reqs": {
+        "count": 2255,
+        "rate": 37.4271427641544
+      },
+      "data_received": {
+        "count": 1444255,
+        "rate": 23970.881628755567
+      },
+      "app_errors": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 2255,
+        "thresholds": {
+          "rate==0": true
+        }
+      }
+    },
+    "notes": ""
+  },
+  "server": {
+    "samples": 12,
+    "maxRssMb": 225,
+    "maxCpuPct": 35,
+    "maxLoopP99Ms": 69,
+    "trend": [
+      {
+        "rssMb": 106,
+        "heapMb": 30
+      },
+      {
+        "rssMb": 125,
+        "heapMb": 45
+      },
+      {
+        "rssMb": 146,
+        "heapMb": 50
+      },
+      {
+        "rssMb": 199,
+        "heapMb": 42
+      },
+      {
+        "rssMb": 200,
+        "heapMb": 58
+      },
+      {
+        "rssMb": 220,
+        "heapMb": 58
+      }
+    ],
+    "errorLines": []
+  }
+}

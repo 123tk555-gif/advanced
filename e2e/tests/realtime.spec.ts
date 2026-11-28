@@ -1,4 +1,5 @@
-import { type Browser, expect, type Page, test } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
+import { expect, test } from "./fixtures.js";
 import { addItem, createTrip, inviteUrl, joinAndApprove, openAs } from "./helpers.js";
 
 /** リアルタイム更新。どのテストも再読み込みをせずに確かめる */

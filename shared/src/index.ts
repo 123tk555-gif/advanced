@@ -12,6 +12,7 @@ export {
   itemCreate,
   itemPatch,
   MAX_COMMENTS_PER_ITEM,
+  MAX_COMMENTS_PER_TRIP,
   MAX_IDEAS_PER_TRIP,
   MAX_ITEMS_PER_TRIP,
   type Place,

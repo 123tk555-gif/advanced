@@ -37,6 +37,7 @@ const amount = ref<number | null>(null);
 const paidBy = ref(user.value?.userId ?? "");
 const splitWith = ref<string[]>(props.view.members.map((m) => m.userId));
 const errors = ref<string[]>([]);
+const recording = ref(false);
 watch(
   () => props.view.members.map((m) => m.userId).join(","),
   (now, before) => {
@@ -61,7 +62,8 @@ async function record() {
   }
   if (!splitWith.value.length) found.push("分け合う人を 1 人以上選んでください");
   errors.value = found;
-  if (found.length) return;
+  if (found.length || recording.value) return;
+  recording.value = true;
   try {
     await api.post(`/trips/${tripId.value}/expenses`, {
       title: title.value.trim(),
@@ -75,6 +77,8 @@ async function record() {
     emit("changed");
   } catch (error) {
     errors.value = [errorMessage(error)];
+  } finally {
+    recording.value = false;
   }
 }
 
@@ -160,7 +164,9 @@ async function remove(e: Expense) {
             {{ m.displayName }}
           </label>
         </fieldset>
-        <div class="actions"><button type="submit" class="primary">記録する</button></div>
+        <div class="actions">
+          <button type="submit" class="primary" :disabled="recording">記録する</button>
+        </div>
       </form>
     </section>
 

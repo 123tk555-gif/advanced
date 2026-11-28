@@ -1,0 +1,87 @@
+{
+  "id": "L2",
+  "quick": false,
+  "began": "2026-11-23T06:46:51.889Z",
+  "ended": "2026-11-23T06:59:08.935Z",
+  "result": {
+    "code": 99,
+    "metrics": {
+      "http_reqs": {
+        "count": 53597,
+        "rate": 87.01771245962162
+      },
+      "data_received": {
+        "count": 1764968379,
+        "rate": 2865524.3932336974
+      },
+      "app_read_ms": {
+        "med": 1096.4578815,
+        "p(90)": 1259.2843558,
+        "p(95)": 1333.5489976,
+        "p(99)": 1566.7150558399999,
+        "max": 2116.21858,
+        "count": 48184,
+        "avg": 1072.1598365817108,
+        "min": 8.189971,
+        "thresholds": {
+          "p(95)<500": false
+        }
+      },
+      "app_errors": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 53597,
+        "thresholds": {
+          "rate<0.01": true
+        }
+      },
+      "app_write_ms": {
+        "p(90)": 1510.6958454,
+        "p(95)": 1588.5516398,
+        "p(99)": 1846.77494344,
+        "max": 2470.105474,
+        "count": 5413,
+        "avg": 1250.6150080999428,
+        "min": 12.358765,
+        "med": 1243.494564,
+        "thresholds": {
+          "p(95)<1000": false
+        }
+      }
+    },
+    "notes": "time=\"2026-11-23T06:59:08Z\" level=error msg=\"thresholds on metrics 'app_read_ms, app_write_ms' have been crossed\"\n"
+  },
+  "server": {
+    "samples": 143,
+    "maxRssMb": 338,
+    "maxCpuPct": 111,
+    "maxLoopP99Ms": 457,
+    "trend": [
+      {
+        "rssMb": 217,
+        "heapMb": 64
+      },
+      {
+        "rssMb": 309,
+        "heapMb": 86
+      },
+      {
+        "rssMb": 325,
+        "heapMb": 86
+      },
+      {
+        "rssMb": 325,
+        "heapMb": 83
+      },
+      {
+        "rssMb": 330,
+        "heapMb": 88
+      },
+      {
+        "rssMb": 332,
+        "heapMb": 88
+      }
+    ],
+    "errorLines": []
+  }
+}

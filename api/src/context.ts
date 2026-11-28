@@ -13,6 +13,11 @@ export interface Deps {
   now: () => Date;
   /** 変更の通知先(WebSocket) */
   realtime: Notifier;
+  /**
+   * 応答の後でよい処理(大きな旅の後片付けなど)。手元の開発用サーバーは待たずに応答し、
+   * Lambda は応答の後に動けないので待ってから応答する(AWS に公開するときに別の仕組みへ移す)
+   */
+  later: (task: () => Promise<void>) => Promise<void>;
 }
 
 export interface AppEnv {

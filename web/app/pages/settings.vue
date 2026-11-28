@@ -48,7 +48,7 @@ watch(theme, (t) => {
 });
 
 async function logout() {
-  auth.logout();
+  await auth.logout();
   toast("ログアウトしました");
   await navigateTo("/login");
 }
@@ -63,12 +63,21 @@ async function withdraw() {
   if (!ok) return;
   try {
     await api.del("/me");
-    auth.logout();
-    toast("退会しました");
-    await navigateTo("/login");
   } catch (error) {
     toast(errorMessage(error));
+    return;
   }
+  try {
+    // 旅の記録の退会は済んでいる。ログインの仕組みからも利用者を消す
+    await auth.deleteAccount();
+    toast("退会しました");
+  } catch {
+    await auth.logout();
+    toast(
+      "退会しました。ログインの情報の削除に失敗したため、時間をおいてもう一度ログインして退会してください",
+    );
+  }
+  await navigateTo("/login");
 }
 
 const themes = { system: "端末に合わせる", light: "ライト", dark: "ダーク" } as const;

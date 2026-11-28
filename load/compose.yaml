@@ -1,0 +1,9 @@
+# 負荷試験専用の DynamoDB Local。普段の開発用(8000 番)とは別。このパソコンの中からだけつながる
+# 起動・片付けは load/run.mjs が行う
+name: tritri-load
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: -jar DynamoDBLocal.jar -inMemory -sharedDb
+    ports:
+      - "127.0.0.1:8001:8000"

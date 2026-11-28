@@ -140,10 +140,13 @@ async function remove(item: ItemWithComments) {
 
 // ---- コメント ----
 const commentDrafts = reactive<Record<string, string>>({});
+const sending = reactive<Record<string, boolean>>({});
 const openDetails = reactive<Record<string, boolean>>({});
 async function addComment(item: ItemWithComments) {
   const body = (commentDrafts[item.itemId] ?? "").trim();
   if (!body) return toast("コメントを入力してください");
+  if (sending[item.itemId]) return;
+  sending[item.itemId] = true;
   try {
     await api.post(`/trips/${tripId.value}/items/${item.itemId}/comments`, { body });
     commentDrafts[item.itemId] = "";
@@ -151,6 +154,8 @@ async function addComment(item: ItemWithComments) {
     emit("changed");
   } catch (error) {
     toast(errorMessage(error));
+  } finally {
+    sending[item.itemId] = false;
   }
 }
 async function deleteComment(item: ItemWithComments, commentId: string) {
@@ -247,7 +252,7 @@ function nameOf(userId: string) {
                     type="button"
                     class="small"
                     :data-move="`${it.itemId}:1`"
-                    :disabled="it.itemId === lastId"
+                    :disabled="it.itemId === lastId && it.day === days"
                     :aria-label="`「${it.title}」を下へ`"
                     @click="move(it, 1)"
                   >
@@ -304,7 +309,7 @@ function nameOf(userId: string) {
                         type="text"
                         maxlength="200"
                       />
-                      <button type="submit" class="small">送る</button>
+                      <button type="submit" class="small" :disabled="sending[it.itemId]">送る</button>
                     </div>
                   </form>
                   <p class="small muted">

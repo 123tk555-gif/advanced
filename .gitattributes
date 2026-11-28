@@ -1,0 +1,5 @@
+# 改行は LF にそろえる(Windows でブランチを切り替えても、整形の検査が通るように)
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.docx binary
